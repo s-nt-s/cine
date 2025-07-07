@@ -5,7 +5,7 @@ from dataclasses import dataclass, asdict
 class Film:
     id: str
     url: str
-    name: str
+    title: str
     img: str
 
     def merge(self, **kwargs):

@@ -3,7 +3,7 @@ from core.web import Web
 from requests.exceptions import TooManyRedirects
 import json
 from core.film import Film
-from bs4 import Tag
+from collections import defaultdict
 
 
 def _get_id_from_url(prefix: str, url: str):
@@ -40,28 +40,29 @@ class Rtve(Web):
             idAsset = js.get("idAsset")
             if idAsset is None or js.get("tipo") != "video":
                 continue
+            # info = json.loads(self.soup.select_one(f'[data-idasset="{idAsset}"][data-share]').attrs["data-share"])
             a = li.select_one("a[href]")
-            img = self.first_select_one(li, "img.poster[data-src]", "img.poster[src]", "img[data-src]", "img[src]")
+            img = li.select_one("img[data-src*=vertical]")
             idAsset = int(idAsset)
             films.add(Film(
                 id=f"rtve{idAsset}",
-                name=js['title'],
+                title=js['title'],
                 url=a.attrs["href"],
-                img=img.attrs.get("data-src") or img.attrs.get("src")
+                img=img.attrs["data-src"] if img else None
             ))
         return tuple(films)
 
-    def first_select_one(self, node: Tag, *args):
-        for a in args:
-            n = node.select_one(a)
-            if n:
-                return n
-
     @cached_property
     def films(self):
-        films: set[int] = set()
+        dct_films: dict[Film, set[str]] = defaultdict(set)
         for url in self.urls:
-            films = films.union(self.get_films(url))
+            for f in self.get_films(url):
+                dct_films[f.merge(img=None)].add(f.img)
+        films: set[Film] = set()
+        for f, imgs in dct_films.items():
+            if len(imgs) > 1 and None in imgs:
+                imgs.remove(None)
+            films.add(f.merge(img=imgs.pop() or "#"))
         return tuple(sorted(films))
 
 
