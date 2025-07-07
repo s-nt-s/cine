@@ -8,6 +8,7 @@ from _collections_abc import dict_items
 from os.path import relpath, dirname, exists, isfile
 from os import environ, makedirs
 from base64 import b64encode
+from bs4 import Tag
 
 import bs4
 from jinja2 import Environment, FileSystemLoader
@@ -16,6 +17,10 @@ re_br = re.compile(r"<br/>(\s*</)")
 re_sp = re.compile(r"\s+")
 PAGE_URL = environ['PAGE_URL']
 REPO_URL = environ['REPO_URL']
+
+
+def get_text(n: Tag):
+    return re_sp.sub(" ", n.get_text()).strip()
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -110,6 +115,14 @@ def twoDec(i: float):
     return '%0.2f' % i
 
 
+def yjoin(arr: tuple):
+    if len(arr) == 0:
+        return None
+    if len(arr) == 1:
+        return arr[0]
+    return ", ".join(arr[:-1])+" y "+arr[-1]
+
+
 def get_default_target_links(soup: bs4.Tag):
     def _isRemote(href: str):
         proto = href.split("://")[0].lower()
@@ -143,6 +156,7 @@ class Jnj2():
         self.j2_env.filters['to_value'] = to_value
         self.j2_env.filters['simplify'] = simplify
         self.j2_env.filters['twoDec'] = twoDec
+        self.j2_env.filters['yjoin'] = yjoin
         self.destino = destino
         self.pre = pre
         self.post = post
@@ -179,6 +193,7 @@ class Jnj2():
         directorio = dirname(destino)
 
         html = self.do_relative(directorio, html)
+        html = self.do_fix(html)
         html = self.do_minimity(html)
         html = self.set_target(html)
         html = self.add_favicon(html)
@@ -214,6 +229,28 @@ class Jnj2():
             if len(link) == 0:
                 link = "./"
             n.attrs[attr] = link
+        return str(soup)
+
+    def do_fix(self, html: str):
+        soup = bs4.BeautifulSoup(html, 'html.parser')
+        bak = ''
+        while bak != str(soup):
+            bak = str(soup)
+            for n in soup.select("b, strong, i, em, span, p, div"):
+                n_text = get_text(n)
+                if n_text in ("", "None", "(None)") and not n.select_one(":scope > *"):
+                    n.extract()
+            for p1 in soup.select("p"):
+                p1_text = get_text(p1)
+                if len(p1_text) == 0 and not soup.select_one(":scope > *"):
+                    p1.extract()
+                    continue
+                p2 = p1.select_one(":scope > p")
+                if p2 is None:
+                    continue
+                p2_text = get_text(p2)
+                if p1_text == p2_text:
+                    p2.unwrap()
         return str(soup)
 
     def do_minimity(self, html: str):

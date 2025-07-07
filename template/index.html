@@ -23,12 +23,20 @@
   <main>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="{{f.id}}">
+      <div class="film" id="rtve{{f.id}}">
+        <h1 style="display: none">{{f.title}}</h1>
         <img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy"/>
-        <p>
-          <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
-          <br />
-        </p>
+        <div>
+          <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span></p>
+          <p>
+            <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
+          </p>
+          <p><b>{{f.director|yjoin}}</b>{%if f.director and f.casting %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
+          <p>{{f.description}}</p>
+          {% if f.expiration %}
+          <!--p>Disponible hasta <span class="expiration">{{f.expiration}}</span></p-->
+          {% endif %}
+         </div>
       </div>
       {% endfor %}
     </div>

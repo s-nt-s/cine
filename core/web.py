@@ -29,6 +29,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 import logging
 from typing import Union
+from requests import RequestException
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,15 @@ class Web:
         content = self.__cached_get(url)
         soup = buildSoup(url, content, parser=parser)
         return soup
+
+    @cache
+    def expand(self, url: str):
+        try:
+            r = self.s.head(url, allow_redirects=True, timeout=5)
+            return r.url
+        except RequestException as e:
+            logger.warning(f"Error al expandir {url} : {e}")
+            return url
 
 
 class MyTag:
