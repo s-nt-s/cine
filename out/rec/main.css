@@ -156,3 +156,6 @@ span.accion-y-aventuras {
 span.historia {
   background-color: cadetblue;
 }
+span.duration {
+  white-space: nowrap;
+}
