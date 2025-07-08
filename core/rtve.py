@@ -75,11 +75,9 @@ class Rtve(Web):
                 logger.warning(f"{idAsset} {title} descartado por {type_name} {sbty_name or ''}".strip())
                 continue
             mainTopic: str = dict_walk(ficha, 'mainTopic', instanceof=str)
-            if mainTopic.startswith("Televisión/Programas de TVE/"):
-                tp_mainTopic = mainTopic.split("/")[2:]
-                if not set(tp_mainTopic).intersection(('Cine', 'Documentales')):#, 'Cinema en català')):
-                    logger.warning(f"{idAsset} {title} descartado por {mainTopic}".strip())
-                    continue
+            if self.__is_ko_mainTopic(mainTopic):
+                logger.warning(f"{idAsset} {title} descartado por {mainTopic}")
+                continue
             if "'" not in title:
                 title = title.replace('"', "'")
             duration = dict_walk(ficha, 'duration', instanceof=int)
@@ -120,6 +118,15 @@ class Rtve(Web):
                 genres=genres
             ))
         return tuple(films)
+
+    def __is_ko_mainTopic(self, mainTopic: str):
+        if mainTopic.startswith("Televisión/Programas de TVE/"):
+            tp_mainTopic = mainTopic.split("/")[2:]
+            if not set(tp_mainTopic).intersection(('Cine', 'Documentales')):#, 'Cinema en català')):
+                return True
+        if mainTopic.startswith('PLAYZ/Series/'):
+            return True
+        return False
 
     def __get_img(self, li: Tag, ficha: dict) -> str:
         for img in li.select("img[data-src*=vertical]"):
@@ -176,7 +183,7 @@ class Rtve(Web):
             if not txt:
                 n.extract()
                 continue
-            if re_or(txt, "^Dirigida por", "^Contenido disponible"):
+            if re_or(txt, "^(Película )?[Dd]irigida por", "^Contenido disponible"):
                 n.extract()
         return str(soup)
 

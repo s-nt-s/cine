@@ -36,23 +36,21 @@ header a, footer a {
 }
 
 div.film {
-  margin-bottom: 6px;
-  vertical-align: top;
-  display: inline-grid;
-  grid-template-columns: 0fr 1fr;
+  overflow: hidden;
+  margin-bottom: 0.3em;
+  display: block;
 }
 div.film > img {
-  grid-column: 1;
-  padding-right: 1em;
+  float: left;
   width: 150px;
+  margin-right: 1em;
+  margin-bottom: 0.5em;
 }
-div.film > div {
-  grid-column: 2;
+div.film > div > p:first-child {
   margin-top: 0;
 }
-div.film > div > *:first-child {
-  margin-top: 0;
-}
+
+
 sup a {
   text-decoration: none;
 }
@@ -80,27 +78,12 @@ fieldset.rangos label span {
   display: inline-block;
   min-width: 5em;
 }
-code {
-  white-space: nowrap;
-}
-code.ofertaTrue {
-  color: green;
-}
 a.title {
   text-decoration: none;
 }
 
 .film.off {
   display: none;
-}
-body.noprice #price {/*, body.noprice code.price {*/
-  display: none;
-}
-a.warn {
-  color: red !important;
-  text-decoration: none !important;
-  font-weight: bold !important;
-  font-size: 1.3em !important;
 }
 
 
@@ -137,6 +120,7 @@ span.genre {
   border-radius: 5px;
   border-color: transparent;
   padding: 5px;
+  display: inline-block;
 }
 
 span.drama {

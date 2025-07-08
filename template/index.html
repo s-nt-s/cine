@@ -40,7 +40,7 @@
         <h1 style="display: none">{{f.title}}</h1>
         <img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy"/>
         <div>
-          <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span></p>
+          <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> <span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span></p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>
