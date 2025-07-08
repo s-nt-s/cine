@@ -14,16 +14,29 @@
   <title>Cine Gratis</title>
   <meta name="Last-Modified" content="{{NOW.strftime('%Y-%m-%d %H:%M:%S')}}" />
   <link rel="stylesheet" href="rec/main.css" />
-  <!--script src="info.js"></script>
-  <script src="main.js"></script-->
+  <script src="info.js"></script>
+  <script src="rec/main.js"></script>
 </head>
 
 <body>
   {% include "header.html" %}
   <main>
+    <p>
+        <label for="order">Ordenar por:
+          <select id="order">
+            <option value="publicacion" selected>fecha de publicación en esta web</option>
+            <option value="expiracion">fecha fin de disponibilidad</option>
+            <option value="duracion">duración</option>
+            <option value="estreno">año de estreno</option>
+            <option value="titulo">título</option>
+            <option value="director">director</option>
+            <option value="genero">genero</option>
+          </select>
+        </label>
+    </p>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="rtve{{f.id}}">
+      <div class="film" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
         <img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy"/>
         <div>

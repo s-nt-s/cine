@@ -1,12 +1,19 @@
-from dataclasses import dataclass, asdict
+from typing import NamedTuple
 
-
-@dataclass(frozen=True, order=True)
-class Film:
-    id: str
+class Film(NamedTuple):
+    source: str
+    id: int
     url: str
     title: str
     img: str
-
-    def merge(self, **kwargs):
-        return Film(**{**asdict(self), **kwargs})
+    program: str
+    lang: str
+    country: str
+    description: str
+    year: int
+    expiration: str
+    publication: str
+    duration: int
+    director: tuple[str, ...]
+    casting: tuple[str, ...]
+    genres: tuple[str, ...]

@@ -1,0 +1,233 @@
+const isLocal = ["", "localhost"].includes(document.location.hostname);
+const $$ = (slc) => Array.from(document.querySelectorAll(slc));
+
+
+class FormQuery {
+  static ALIAS = Object.freeze({})
+  static form() {
+    const d = {
+      range: {},
+    };
+    document.querySelectorAll("input[id], select[id]").forEach((n) => {
+      if (n.disabled) return;
+      if (/_(max|min)$/.test(n.id)) return;
+      const v = getVal(n.id);
+      if (v === false) return;
+      const nm = n.getAttribute("name");
+      if (nm != null) {
+        if (!Array.isArray(d[nm])) d[nm] = [];
+        d[nm].push(v);
+        return;
+      }
+      d[n.id] = v;
+    });
+    d.range = getRanges(...FormQuery.RANGE.filter(r => (document.getElementById(r + '_min')?.disabled) === false));
+    return d;
+  }
+  static __form_to_query(new_type) {
+    const form = FormQuery.form(new_type);
+    const qr = [];
+    Object.entries(form).forEach(([k, v]) => {
+      if (k == "order" && v == "publicacion") return;
+      if (typeof v === "object" && Object.keys(v).length === 0) return;
+      if (typeof v == "string") v = encodeURIComponent(v);
+      if (v === true) {
+        qr.push(k);
+        return;
+      }
+      qr.push(k + "=" + v);
+    });
+    Object.entries(form.range).forEach(([k, v]) => {
+      const n = document.getElementById(k + "_max");
+      if (
+        Number(n.getAttribute("min")) == v.min &&
+        Number(n.getAttribute("max")) == v.max
+      )
+        return;
+      if (FormQuery.RANGE.includes(k) && MX[k] != null) {
+        if (k == "price" && v.min == 0) return qr.push(k + "=" + v.max);
+        if (v.max == MX[k]) return qr.push(k + "=" + v.min);
+      }
+      qr.push(k + "=" + v.min + "-" + v.max);
+    });
+    const query = qr.join("&")
+    return FormQuery.REV_QUERY[query] ?? query;
+  }
+  static form_to_query(new_type) {
+    let query = "?" + FormQuery.__form_to_query(new_type);
+    if (query == "?") query = "";
+    if (document.location.search == query) return;
+    const url = document.location.href.replace(/\?.*$/, "");
+    history.pushState({}, "", url + query);
+  }
+  static query_to_form() {
+    const query = FormQuery.query();
+    if (query == null) return;
+    Object.entries(query).forEach(([k, v]) => {
+      if (document.getElementById(k) == null) return;
+      setVal(k, v);
+    });
+    const _set_rank_val = (n) => {
+      const [id, k] = n.id.split("_");
+      if (query.range == null || query.range[id] == null || query.range[id][k] == null) {
+        n.value = n.getAttribute(k);
+        return;
+      }
+      n.value = query.range[id][k];
+    }
+    $$("input[id$=_min],input[id$=_max]").forEach(_set_rank_val);
+    if (query.range)
+      Object.entries(query.range).forEach(([k, v]) => {
+        setVal(k + "_min", v["min"]);
+        setVal(k + "_max", v["max"]);
+      });
+  }
+  static query() {
+    const search = (() => {
+      const q = document.location.search.replace(/^\?/, "")
+      if (q.length == 0) return null;
+      return FormQuery.ALIAS[q] ?? q;
+    })();
+    const d = {
+      range: {},
+    };
+    if (search == null) return d;
+    search.split("&").forEach((i) => {
+      const [k, v] = FormQuery.__get_kv(i);
+      if (k == null) return;
+      if (typeof v == "object") {
+        d.range[k] = v;
+        return;
+      }
+      if (Array.isArray(d[k])) d[k] = v.split("+").map((t) => decodeURIComponent(t));
+      else d[k] = v;
+    });
+    return d;
+  }
+  static __get_kv(kv) {
+    const tmp = kv.split("=").flatMap((i) => {
+      i = i.trim();
+      return i.length == 0 ? [] : i;
+    });
+    if (tmp.length == 0) return [null, null];
+    if (tmp.length > 2 || tmp[0].length == 0) return [null, null];
+    const k = tmp[0];
+    if (!isNaN(Number(k))) return [null, null];
+    if (tmp.length == 1) {
+      const opt = document.querySelectorAll(
+        'select option[value="' + k + '"]'
+      );
+      if (opt.length == 1) {
+        return [opt[0].closest("select[id]").id, k];
+      }
+      return [k, true];
+    }
+    let v = tmp[1];
+    if (FormQuery.RANGE.includes(k) && v.match(/^\d+$/) && MX[k] != null) {
+      v = v + '-' + MX[k];
+    }
+    const n = Number(v);
+    if (!isNaN(n)) return [k, n];
+    if (v.match(/^\d+-\d+$/)) {
+      const [_min, _max] = v
+        .split("-")
+        .map((i) => Number(i))
+        .sort((a, b) => a - b);
+      return [k, { min: _min, max: _max }];
+    }
+    return [k, v];
+  }
+}
+FormQuery.REV_QUERY = Object.freeze(Object.fromEntries(Object.entries(FormQuery.ALIAS).map(([k, v]) => [v, k])))
+
+
+function getVal(id) {
+  const elm = document.getElementById(id);
+  if (elm == null) {
+    console.log("No se ha encontrado #" + id);
+    return null;
+  }
+  if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
+    if (elm.checked === false) return false;
+    const v = elm.getAttribute("value");
+    if (v != null) return v;
+    return elm.checked;
+  }
+  const val = (elm.value ?? "").trim();
+  if (val.length == 0) return null;
+  const tp = elm.getAttribute("data-type") || elm.getAttribute("type");
+  if (tp == "number") {
+    const num = Number(val);
+    if (isNaN(num)) return null;
+    return num;
+  }
+  return val;
+}
+
+function setVal(id, v) {
+  const elm = document.getElementById(id);
+  if (elm == null) {
+    console.log("No se ha encontrado #" + id);
+    return null;
+  }
+  if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
+    if (arguments.length == 1) v = elm.defaultChecked;
+    elm.checked = v === true;
+    return;
+  }
+  if (arguments.length == 1) {
+    v = elm.defaultValue;
+  }
+  elm.value = v;
+}
+
+function getRanges() {
+  const rgs = {};
+  Array.from(arguments).forEach((k) => {
+    let mn = getVal(k + "_min");
+    let mx = getVal(k + "_max");
+    if (mn == null || mx == null) return;
+    rgs[k] = { min: mn, max: mx };
+  });
+  return rgs;
+}
+
+function ifLocal() {
+  if (!isLocal) return;
+}
+
+
+function setOrder() {
+  const def_order = $$("#order option").filter(o => o.getAttribute("selected") != null)[0].value;
+  const div = document.getElementById("films");
+  div.setAttribute("data-order", def_order);
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    FormQuery.RANGE = Object.freeze(Array.from(new Set(
+      $$("input[id$=_max],input[id$=_min]").filter(n => !n.disabled).map((n) =>
+        n.id.replace(/_(max|min)$/, "")
+      ))));
+    setOrder();
+    ifLocal();
+    FormQuery.query_to_form();
+    document.querySelectorAll("input, select").forEach((i) => {
+      i.addEventListener("change", onChange);
+    });
+    onChange();
+  },
+  false
+);
+
+function onChange() {
+  const div = document.getElementById("films");
+  const form = FormQuery.form();
+  if (form.order != div.getAttribute("data-order")) {
+    console.log("order", div.getAttribute("data-order"), "->", form.order);
+    ORDER.get(form.order).forEach(i => div.append(document.getElementById(i)));
+    div.setAttribute("data-order", form.order);
+  }
+  FormQuery.form_to_query();
+}

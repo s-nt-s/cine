@@ -9,27 +9,10 @@ from core.filemanager import FM
 import logging
 from core.cache import Cache
 from core.util import dict_walk, trim, re_or
+from core.film import Film
 import re
 
 logger = logging.getLogger(__name__)
-
-
-class RtveFilm(NamedTuple):
-    id: int
-    url: str
-    title: str
-    img: str
-    program: str
-    lang: str
-    country: str
-    description: str
-    year: int
-    expiration: str
-    publication: str
-    duration: int
-    director: tuple[str, ...]
-    casting: tuple[str, ...]
-    genres: tuple[str, ...]
 
 
 def _clean_js(obj: list | dict | str, k: str = None):
@@ -71,12 +54,12 @@ class Rtve(Web):
             urls.add("https://www.rtve.es"+a.attrs["data-feed"])
         return tuple(urls)
 
-    def get_films(self, url: str) -> tuple[RtveFilm, ...]:
+    def get_films(self, url: str) -> tuple[Film, ...]:
         try:
             self.get(url)
         except TooManyRedirects:
             return ()
-        films: set[RtveFilm] = set()
+        films: set[Film] = set()
         for li in self.soup.select("*[data-setup]"):
             js = _to_json(li, "data-setup")
             if not isinstance(js, dict):
@@ -118,7 +101,8 @@ class Rtve(Web):
                 return "{2:04d}-{1:02d}-{0:02d}".format(*num[:3])
 
             url = dict_walk(ficha, 'htmlUrl', instanceof=str)
-            films.add(RtveFilm(
+            films.add(Film(
+                source="rtve",
                 id=idAsset,
                 title=title,
                 url=url,
@@ -198,7 +182,7 @@ class Rtve(Web):
 
     @cached_property
     def films(self):
-        dct_films: dict[RtveFilm, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+        dct_films: dict[Film, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
         for url in self.urls:
             for f in self.get_films(url):
                 k = f._replace(
@@ -209,7 +193,7 @@ class Rtve(Web):
                     val = f._asdict()[field]
                     if val is not None:
                         dct_films[k][field].add(val)
-        films: set[RtveFilm] = set()
+        films: set[Film] = set()
         for f, set_values in dct_films.items():
             for k, v in set_values.items():
                 if k == "img":
