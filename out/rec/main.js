@@ -203,6 +203,7 @@ function setOrder() {
   div.setAttribute("data-order", def_order);
 }
 
+
 document.addEventListener(
   "DOMContentLoaded",
   () => {
@@ -217,9 +218,93 @@ document.addEventListener(
       i.addEventListener("change", onChange);
     });
     onChange();
+    FormQuery.doPlay = async (url) => {
+      const video = mkVideo(url);
+      if (video == null) {
+        alert('Función no soportada');
+        return false;
+      }
+    }
   },
   false
 );
+
+function mkVideo(url) {
+    const video = document.createElement("video");
+    if (video==null) return null;
+    video.controls = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      return video;
+    };
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    document.body.insertBefore(video, document.body.firstChild);
+    return video;
+}
+
+function mkVideoInNewTab(url) {
+  const newWindow = window.open('', '_blank');
+  if (!newWindow) {
+    alert("No se pudo abrir una nueva pestaña. Asegúrate de que no esté bloqueada por el navegador.");
+    return;
+  }
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Reproductor M3U8</title>
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+      <style>
+        body {
+          margin: 0;
+          background: black;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+        }
+        video {
+          max-width: 100%;
+          max-height: 100%;
+          background: black;
+        }
+      </style>
+      <script>
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+        const video = document.getElementById('video');
+        const url = ${JSON.stringify(url)};
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = url;
+        } else if (Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+        } else {
+          alert('Tu navegador no soporta reproducción M3U8.');
+        }
+  },
+  false
+);
+      </script>
+    </head>
+    <body>
+      <video id="video" controls autoplay playsinline></video>
+    </body>
+    </html>
+  `;
+
+  newWindow.document.open();
+  newWindow.document.write(htmlContent);
+  newWindow.document.close();
+}
 
 function onChange() {
   const div = document.getElementById("films");

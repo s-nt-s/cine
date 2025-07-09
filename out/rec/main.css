@@ -159,3 +159,12 @@ span.historia {
 span.duration {
   white-space: nowrap;
 }
+video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: black;
+  object-fit: contain; /* Asegura que el contenido no se deforme */
+}
