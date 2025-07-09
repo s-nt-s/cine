@@ -13,7 +13,7 @@ from core.film import Film
 import re
 
 logger = logging.getLogger(__name__)
-
+re_sp = re.compile(r"\s+")
 
 def _clean_js(obj: list | dict | str, k: str = None):
     if isinstance(obj, str):
@@ -71,6 +71,7 @@ class Rtve(Web):
             type_name: str = dict_walk(ficha, 'type/name', instanceof=str)
             sbty_name: str = dict_walk(ficha, 'subType/name', instanceof=(str, type(None)))
             title: str = dict_walk(js, 'title', instanceof=str)
+            title = re_sp.sub(" ", title).strip()
             if type_name in ('Avance', 'Fragmento'):
                 logger.warning(f"{idAsset} {title} descartado por {type_name} {sbty_name or ''}".strip())
                 continue
@@ -80,6 +81,7 @@ class Rtve(Web):
                 continue
             if "'" not in title:
                 title = title.replace('"', "'")
+            title = re.sub(r"\s*\(\s*[Cc]ortometraje\s*\)\s*$", "", title)
             duration = dict_walk(ficha, 'duration', instanceof=int)
             if isinstance(duration, int):
                 duration = int(duration/(60*1000))
@@ -140,7 +142,8 @@ class Rtve(Web):
             'previews/horizontal2'
             'previews/square',
             'previews/square2',
-            'imageSEO'
+            'imageSEO',
+            'thumbnail'
         ):
             v = dict_walk(ficha, k, instanceof=(str, type(None)))
             if isinstance(v, str):
@@ -153,16 +156,39 @@ class Rtve(Web):
                     return img
 
     def __get_genres(self, ficha: dict):
+        mainTopic = dict_walk(ficha, 'mainTopic', instanceof=(str, type(None)))
+        longTitle = dict_walk(ficha, 'longTitle', instanceof=(str, type(None)))
+        ecort_content = dict_walk(ficha, 'escort/content', instanceof=(str, type(None)))
+        programType = dict_walk(ficha, 'programInfo/programType', instanceof=(str, type(None)))
+        if re_or(longTitle, r"^Cine [iI]nfantil"):
+            return ("Infantil", )
+        if re_or(longTitle, r"^Somos [dD]documentales"):
+            return ("Documental", )
+        if re_or(mainTopic, r"[Pp]el[íi]culas [Dd]ocumentales"):
+            return ("Documental", )
+        #if re_or(ecort_content, r"[Nn]o [Ff]icci[oó]n[\-\-\s]*[Ii]nformaci[óo]n"):
+        #    return ("Documental", )
+        if re_or(programType, r"[dD]ocumental"):
+            return ("Documental", )
+        if re_or(mainTopic, r"Thriller"):
+            return ("Suspense", )
         genres: set[str] = set()
         for g in (ficha.get("generos") or []):
-            for k in ('generoInf', 'subGeneroInf'):
-                v = trim(g.get(k))
-                if v in (None, "Cine"):
-                    continue
-                if v in ("Documentales", "Biografías", "Historia"):
-                    v = "Documental"
-                genres.add(v)
-        return tuple(genres)
+            v = trim(g.get('subGeneroInf')) or trim(g.get('generoInf'))
+            if v in (None, "Cine", "Cultura"):
+                continue
+            v = {
+                "Documentales": "Documental",
+                "Biografías": "Biográfico",
+                "Música": "Musical",
+                "Policíaca y suspense": "Suspense",
+            }.get(v, v)
+            genres.add(v)
+        if len(genres):
+            return tuple(genres)
+        if re_or(ecort_content, "[dD]rama"):
+            return ("Drama", )
+        return tuple()
 
     def __get_description(self, url: str, ficha: dict):
         arr = [i for i in map(
