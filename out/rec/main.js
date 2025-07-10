@@ -24,11 +24,14 @@ class FormQuery {
     d.range = getRanges(...FormQuery.RANGE.filter(r => (document.getElementById(r + '_min')?.disabled) === false));
     return d;
   }
-  static __form_to_query(new_type) {
-    const form = FormQuery.form(new_type);
+  static __form_to_query() {
+    const form = FormQuery.form();
     const qr = [];
     Object.entries(form).forEach(([k, v]) => {
-      if (k == "order" && v == "publicacion") return;
+      if (k == "order") {
+        if (FormQuery.ORDER.includes(v)) qr.push(v);
+        return;
+      }
       if (typeof v === "object" && Object.keys(v).length === 0) return;
       if (typeof v == "string") v = encodeURIComponent(v);
       if (v === true) {
@@ -53,8 +56,8 @@ class FormQuery {
     const query = qr.join("&")
     return FormQuery.REV_QUERY[query] ?? query;
   }
-  static form_to_query(new_type) {
-    let query = "?" + FormQuery.__form_to_query(new_type);
+  static form_to_query() {
+    let query = "?" + FormQuery.__form_to_query();
     if (query == "?") query = "";
     if (document.location.search == query) return;
     const url = document.location.href.replace(/\?.*$/, "");
@@ -112,6 +115,7 @@ class FormQuery {
     if (tmp.length == 0) return [null, null];
     if (tmp.length > 2 || tmp[0].length == 0) return [null, null];
     const k = tmp[0];
+    if (FormQuery.ORDER.includes(k)) return ["order", k];
     if (!isNaN(Number(k))) return [null, null];
     if (tmp.length == 1) {
       const opt = document.querySelectorAll(
@@ -201,6 +205,7 @@ function setOrder() {
   const def_order = $$("#order option").filter(o => o.getAttribute("selected") != null)[0].value;
   const div = document.getElementById("films");
   div.setAttribute("data-order", def_order);
+  FormQuery.ORDER = $$("#order option[value]").flatMap(i=>[null, "", def_order].includes(i.value)?[]:i.value);
 }
 
 
@@ -218,92 +223,50 @@ document.addEventListener(
       i.addEventListener("change", onChange);
     });
     onChange();
-    FormQuery.doPlay = async (url) => {
-      const video = mkVideo(url);
-      if (video == null) {
-        alert('Función no soportada');
-        return false;
-      }
-    }
   },
   false
 );
-
-function mkVideo(url) {
-    const video = document.createElement("video");
-    if (video==null) return null;
-    video.controls = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      return video;
-    };
+function mkVideo(url, fireByUser) {
+  fireByUser = fireByUser===true;
+  let div = document.getElementById("video");
+  if (div) div.remove();
+  if (url == null) return null;
+  const video = document.createElement("video");
+  if (video==null) {
+    alert('Función no soportada');
+    return null;
+  }
+  video.controls = true;
+  video.autoplay = true;
+  video.playsInline = false;
+  video.muted = !fireByUser;
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+  } else {
     const hls = new Hls();
     hls.loadSource(url);
     hls.attachMedia(video);
-    document.body.insertBefore(video, document.body.firstChild);
-    return video;
-}
-
-function mkVideoInNewTab(url) {
-  const newWindow = window.open('', '_blank');
-  if (!newWindow) {
-    alert("No se pudo abrir una nueva pestaña. Asegúrate de que no esté bloqueada por el navegador.");
-    return;
   }
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <title>Reproductor M3U8</title>
-      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-      <style>
-        body {
-          margin: 0;
-          background: black;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-        }
-        video {
-          max-width: 100%;
-          max-height: 100%;
-          background: black;
-        }
-      </style>
-      <script>
-document.addEventListener(
-  "DOMContentLoaded",
-  () => {
-        const video = document.getElementById('video');
-        const url = ${JSON.stringify(url)};
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = url;
-        } else if (Hls.isSupported()) {
-          const hls = new Hls();
-          hls.loadSource(url);
-          hls.attachMedia(video);
-        } else {
-          alert('Tu navegador no soporta reproducción M3U8.');
-        }
-  },
-  false
-);
-      </script>
-    </head>
-    <body>
-      <video id="video" controls autoplay playsinline></video>
-    </body>
-    </html>
-  `;
 
-  newWindow.document.open();
-  newWindow.document.write(htmlContent);
-  newWindow.document.close();
+  div = document.createElement("div");
+  div.id = "video";
+  const button = document.createElement("button");
+  button.textContent="Cerrar video";
+  button.addEventListener("click", ()=>mkVideo());
+  div.appendChild(video);
+  div.appendChild(button);
+  document.body.insertBefore(div, document.body.firstChild);
+  if (fireByUser) video.play();
+  else {
+    const events = ['mousemove', 'keydown', 'click'];
+    const onFirstUserInteraction = () => {
+      console.log("onFirstUserInteraction");
+      video.muted = false;
+      events.forEach(e=> window.removeEventListener(e, onFirstUserInteraction));
+    }
+    events.forEach(e=>window.addEventListener(e, onFirstUserInteraction));
+  }
+  return video;
 }
 
 function onChange() {

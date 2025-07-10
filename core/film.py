@@ -14,6 +14,8 @@ class Film(NamedTuple):
     expiration: str
     publication: str
     duration: int
+    idImdb: str
+    imdbRate: float
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]

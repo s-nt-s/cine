@@ -491,3 +491,10 @@ def uniq(*args: Union[str, None]):
         if a not in (None, '') and a not in arr:
             arr.append(a)
     return arr
+
+
+def tp_split(sep: str, s:str) -> tuple[str, ...]:
+    if s is None:
+        return tuple()
+    spl = re.split(r"\s*"+re.escape(sep)+r"\s*", s)
+    return tuple(uniq(*spl))

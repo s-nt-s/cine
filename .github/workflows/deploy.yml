@@ -42,6 +42,8 @@ jobs:
       - name: Install pip packages
         run: pip install -r requirements.txt
       - name: BUILD
+        env:
+          OMDBAPI_KEY: ${{ secrets.OMDBAPI_KEY }}
         continue-on-error: false
         uses: nick-fields/retry@v2
         with:

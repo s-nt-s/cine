@@ -10,7 +10,9 @@ import logging
 from core.cache import Cache
 from core.util import dict_walk, trim, re_or
 from core.film import Film
+from core.omdbapi import OMDB
 import re
+from core.util import tp_split
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
@@ -20,15 +22,30 @@ def _clean_js(obj: list | dict | str, k: str = None):
         obj = obj.strip()
         if len(obj) == 0:
             return None
-        if isinstance(k, str) and k.startswith("id") and obj.isdigit():
-            return int(obj)
+        if isinstance(k, str):
+            if obj.isdigit() and (k in ("duration", "productionDate", "imdbRate") or k.startswith("id")):
+                return int(obj)
+            if k in ("director", "casting"):
+                return list(tp_split("|", obj))
+            if re.match(r"^\d+\.\d+$", obj) and k in ("imdbRate", ):
+                return float(obj)
         return obj
     if isinstance(obj, list):
         return [_clean_js(i) for i in obj]
     if isinstance(obj, dict):
         for k, v in list(obj.items()):
-            obj[k] = _clean_js(v, k=k)
+            v = _clean_js(v, k=k)
+            if k in ("imdbRate", ) and isinstance(v, (int, float)) and v<0:
+                v = None
+            obj[k] = v
     return obj
+
+def _g_date(ficha: dict, k: str):
+    s = dict_walk(ficha, k, instanceof=(str, type(None)))
+    if s is None:
+        return None
+    num = tuple(map(int, re.findall(r"\d+", s)))
+    return "{2:04d}-{1:02d}-{0:02d}".format(*num[:3])
 
 
 def _to_json(n: Tag, attr: str):
@@ -82,43 +99,58 @@ class Rtve(Web):
             if "'" not in title:
                 title = title.replace('"', "'")
             title = re.sub(r"\s*\(\s*[Cc]ortometraje\s*\)\s*$", "", title)
-            duration = dict_walk(ficha, 'duration', instanceof=int)
-            if isinstance(duration, int):
-                duration = int(duration/(60*1000))
             year: int = dict_walk(ficha, 'productionDate', instanceof=(int, type(None)))
-            director: str = dict_walk(ficha, 'director', instanceof=(str, type(None))) or ''
-            casting: str = dict_walk(ficha, 'casting', instanceof=(str, type(None))) or ''
-            genres = self.__get_genres(ficha)
+            genres = self.__get_genres(ficha, None)
             if "Playz joven" in genres:
                 logger.warning(f"{idAsset} {title} descartado por genero {', '.join(genres)}".strip())
                 continue
 
-            def _g_date(k: str):
-                s = dict_walk(ficha, k, instanceof=(str, type(None)))
-                if s is None:
-                    return None
-                num = tuple(map(int, re.findall(r"\d+", s)))
-                return "{2:04d}-{1:02d}-{0:02d}".format(*num[:3])
+            idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None))) or \
+                    OMDB.get_id(title, year)
+            metad = OMDB.get(idImdb)
+            if metad is not None:
+                if metad.get("Type") == "episode":
+                    logger.warning(f"{idAsset} {title} descartado por que es una serie según OMDb")
+                    continue
+
+            genres = self.__get_genres(ficha, metad)
+            img = self.__get_img(li, ficha, metad)
+            director: list[str] = dict_walk(ficha, 'director', instanceof=(list, type(None))) or \
+                                  dict_walk(metad, 'Director', instanceof=(list, type(None))) or \
+                                  list()
+            casting: list[str] = dict_walk(ficha, 'casting', instanceof=(list, type(None))) or \
+                                 dict_walk(metad, 'Actors', instanceof=(list, type(None))) or \
+                                 list()
+            imdbRate: float = dict_walk(ficha, 'imdbRate', instanceof=(int, float, type(None))) or \
+                              dict_walk(metad, 'imdbRating', instanceof=(int, float, type(None)))
+            duration = dict_walk(ficha, 'duration', instanceof=int)
+            if isinstance(duration, int):
+                duration = int(duration/(60*1000))
+            if year is None:
+                year: int = dict_walk(metad, 'Year', instanceof=(int, type(None)))
 
             url = dict_walk(ficha, 'htmlUrl', instanceof=str)
-            films.add(Film(
+            f = Film(
                 source="rtve",
                 id=idAsset,
                 title=title,
                 url=url,
-                img=self.__get_img(li, ficha),
+                img=img,
                 program=dict_walk(ficha, 'programInfo/title', instanceof=(str, type(None))),
                 lang=dict_walk(ficha, 'language', instanceof=str),
                 country=dict_walk(ficha, 'country', instanceof=str),
                 description=self.__get_description(url, ficha),
                 year=year,
-                expiration=_g_date('expirationDate'),
-                publication=_g_date('publicationDate'),
+                expiration=_g_date(ficha, 'expirationDate'),
+                publication=_g_date(ficha, 'publicationDate'),
                 duration=duration,
-                director=tuple(i for i in map(trim, director.split(" | ")) if i),
-                casting=tuple(i for i in map(trim, casting.split(" | ")) if i),
-                genres=genres
-            ))
+                director=tuple(director),
+                casting=tuple(casting),
+                genres=tuple(genres),
+                idImdb=idImdb,
+                imdbRate=imdbRate
+            )
+            films.add(f)
         return tuple(films)
 
     def __is_ko_mainTopic(self, mainTopic: str):
@@ -130,14 +162,16 @@ class Rtve(Web):
             return True
         return False
 
-    def __get_img(self, li: Tag, ficha: dict) -> str:
+    def __get_img(self, li: Tag, ficha: dict, metadata: dict) -> str:
         for img in li.select("img[data-src*=vertical]"):
             src = img.attrs["data-src"]
             if src:
                 return src
+        ficha['__poster'] = None if metadata is None else metadata.get("Poster")
         for k in (
             'previews/vertical',
             'previews/vertical2',
+            '__poster',
             'previews/horizontal',
             'previews/horizontal2'
             'previews/square',
@@ -155,7 +189,7 @@ class Rtve(Web):
                 if isinstance(img, str):
                     return img
 
-    def __get_genres(self, ficha: dict):
+    def __get_genres(self, ficha: dict, metadata: dict):
         mainTopic = dict_walk(ficha, 'mainTopic', instanceof=(str, type(None)))
         longTitle = dict_walk(ficha, 'longTitle', instanceof=(str, type(None)))
         ecort_content = dict_walk(ficha, 'escort/content', instanceof=(str, type(None)))
@@ -188,6 +222,9 @@ class Rtve(Web):
             return tuple(genres)
         if re_or(ecort_content, "[dD]rama"):
             return ("Drama", )
+        mg = dict_walk(metadata, 'Genre', instanceof=(list, type(None)))
+        if mg:
+            return tuple(mg)
         return tuple()
 
     def __get_description(self, url: str, ficha: dict):
