@@ -3,7 +3,7 @@ from core.web import Web, buildSoup, get_text
 from requests.exceptions import TooManyRedirects
 import json
 from collections import defaultdict
-from typing import NamedTuple, Any
+from typing import Any
 from bs4 import Tag
 from core.filemanager import FM
 import logging
@@ -12,10 +12,12 @@ from core.util import dict_walk, trim, re_or
 from core.film import Film
 from core.omdbapi import OMDB
 import re
-from core.util import tp_split
+from core.util import tp_split, to_int_float
+
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
+
 
 def _clean_js(obj: list | dict | str, k: str = None):
     if isinstance(obj, str):
@@ -39,6 +41,7 @@ def _clean_js(obj: list | dict | str, k: str = None):
                 v = None
             obj[k] = v
     return obj
+
 
 def _g_date(ficha: dict, k: str):
     s = dict_walk(ficha, k, instanceof=(str, type(None)))
@@ -108,10 +111,9 @@ class Rtve(Web):
             idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None))) or \
                     OMDB.get_id(title, year)
             metad = OMDB.get(idImdb)
-            if metad is not None:
-                if metad.get("Type") == "episode":
-                    logger.warning(f"{idAsset} {title} descartado por que es una serie según OMDb")
-                    continue
+            if self.__is_serie(idImdb, metad):
+                logger.warning(f"{idAsset} {title} descartado por que es una serie según OMDb")
+                continue
 
             genres = self.__get_genres(ficha, metad)
             img = self.__get_img(li, ficha, metad)
@@ -123,6 +125,7 @@ class Rtve(Web):
                                  list()
             imdbRate: float = dict_walk(ficha, 'imdbRate', instanceof=(int, float, type(None))) or \
                               dict_walk(metad, 'imdbRating', instanceof=(int, float, type(None)))
+            imdbVotes: int = dict_walk(metad, 'imdbVotes', instanceof=(int, type(None)))
             duration = dict_walk(ficha, 'duration', instanceof=int)
             if isinstance(duration, int):
                 duration = int(duration/(60*1000))
@@ -147,11 +150,22 @@ class Rtve(Web):
                 director=tuple(director),
                 casting=tuple(casting),
                 genres=tuple(genres),
-                idImdb=idImdb,
-                imdbRate=imdbRate
+                imdbId=idImdb,
+                imdbRate=to_int_float(imdbRate),
+                imdbVotes=imdbVotes
             )
             films.add(f)
         return tuple(films)
+
+    def __is_serie(self, imdb: str, metadata: dict):
+        if imdb is None:
+            return False
+        if metadata:
+            return metadata.get("Type") == "episode"
+        soup = self.get(f"https://www.imdb.com/es-es/title/{imdb}")
+        if soup.find("a", string=re.compile(r"^\s*Todos\s*los\s*episodios\s*$", flags=re.I)):
+            return True
+        return False
 
     def __is_ko_mainTopic(self, mainTopic: str):
         if mainTopic.startswith("Televisión/Programas de TVE/"):

@@ -1,5 +1,6 @@
 from typing import NamedTuple
 
+
 class Film(NamedTuple):
     source: str
     id: int
@@ -14,8 +15,9 @@ class Film(NamedTuple):
     expiration: str
     publication: str
     duration: int
-    idImdb: str
+    imdbId: str
     imdbRate: float
+    imdbVotes: int
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]

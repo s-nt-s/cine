@@ -34,12 +34,13 @@ order['estreno'] = sort_ids(lambda f: f.year or 0, reverse=True)
 order['genero'] = sort_ids(lambda f: f.genres)
 order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
-order['imdb'] = sort_ids(lambda f: (-(f.imdbRate or -1), 0 if f.idImdb else 1))
+order['imdb'] = sort_ids(lambda f: (-(f.imdbRate or -1), 0 if f.imdbId else 1))
 
 j = Jnj2("template/", "out/", favicon="📽")
 j.create_script(
     "info.js",
-    ORDER=order
+    ORDER=order,
+    replace=True
 )
 j.save(
     "index.html",

@@ -498,3 +498,11 @@ def tp_split(sep: str, s:str) -> tuple[str, ...]:
         return tuple()
     spl = re.split(r"\s*"+re.escape(sep)+r"\s*", s)
     return tuple(uniq(*spl))
+
+
+def to_int_float(i: str|int|float|None):
+    if i is None:
+        return None
+    f = float(i)
+    i = int(i)
+    return i if f==i else f
