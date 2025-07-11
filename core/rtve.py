@@ -8,38 +8,30 @@ from bs4 import Tag
 from core.filemanager import FM
 import logging
 from core.cache import Cache
-from core.util import dict_walk, trim, re_or
+from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float
 from core.film import Film
 from core.omdbapi import OMDB
 import re
-from core.util import tp_split, to_int_float
 
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
 
 
-def _clean_js(obj: list | dict | str, k: str = None):
+def _clean_js(k: str, obj: list | dict | str):
     if isinstance(obj, str):
         obj = obj.strip()
         if len(obj) == 0:
             return None
-        if isinstance(k, str):
-            if obj.isdigit() and (k in ("duration", "productionDate", "imdbRate") or k.startswith("id")):
-                return int(obj)
-            if k in ("director", "casting"):
-                return list(tp_split("|", obj))
-            if re.match(r"^\d+\.\d+$", obj) and k in ("imdbRate", ):
-                return float(obj)
+        if obj.isdigit() and (k in ("duration", "productionDate", "imdbRate") or k.startswith("id")):
+            return int(obj)
+        if k in ("director", "casting", "producedBy"):
+            return list(tp_split("|", obj))
+        if re.match(r"^\d+\.\d+$", obj) and k in ("imdbRate", ):
+            return float(obj)
         return obj
-    if isinstance(obj, list):
-        return [_clean_js(i) for i in obj]
-    if isinstance(obj, dict):
-        for k, v in list(obj.items()):
-            v = _clean_js(v, k=k)
-            if k in ("imdbRate", ) and isinstance(v, (int, float)) and v<0:
-                v = None
-            obj[k] = v
+    if isinstance(obj, (int, float)) and obj < 0 and k in ("imdbRate", ):
+        return None
     return obj
 
 
@@ -61,7 +53,7 @@ def _to_json(n: Tag, attr: str):
     if len(val) == 0:
         return None
     obj = json.loads(val)
-    return _clean_js(obj)
+    return mapdict(_clean_js, obj)
 
 
 class Rtve(Web):
@@ -88,31 +80,25 @@ class Rtve(Web):
             if idAsset is None or js.get("tipo") != "video":
                 continue
             ficha = self.get_ficha(idAsset)
-            type_name: str = dict_walk(ficha, 'type/name', instanceof=str)
-            sbty_name: str = dict_walk(ficha, 'subType/name', instanceof=(str, type(None)))
             title: str = dict_walk(js, 'title', instanceof=str)
             title = re_sp.sub(" ", title).strip()
-            if type_name in ('Avance', 'Fragmento'):
-                logger.warning(f"{idAsset} {title} descartado por {type_name} {sbty_name or ''}".strip())
-                continue
-            mainTopic: str = dict_walk(ficha, 'mainTopic', instanceof=str)
-            if self.__is_ko_mainTopic(mainTopic):
-                logger.warning(f"{idAsset} {title} descartado por {mainTopic}")
-                continue
             if "'" not in title:
                 title = title.replace('"', "'")
             title = re.sub(r"\s*\(\s*[Cc]ortometraje\s*\)\s*$", "", title)
-            year: int = dict_walk(ficha, 'productionDate', instanceof=(int, type(None)))
-            genres = self.__get_genres(ficha, None)
-            if "Playz joven" in genres:
-                logger.warning(f"{idAsset} {title} descartado por genero {', '.join(genres)}".strip())
+
+            is_ko = self.__is_ko(ficha, None, None)
+            if is_ko:
+                logger.warning(f"{idAsset} {title} descartado por "+is_ko)
                 continue
 
-            idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None))) or \
-                    OMDB.get_id(title, year)
+            year: int = dict_walk(ficha, 'productionDate', instanceof=(int, type(None)))
+            idImdb = OMDB.get_id(title, year) or \
+                     dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
             metad = OMDB.get(idImdb)
-            if self.__is_serie(idImdb, metad):
-                logger.warning(f"{idAsset} {title} descartado por que es una serie según OMDb")
+
+            is_ko = self.__is_ko(ficha, idImdb, metad)
+            if is_ko:
+                logger.warning(f"{idAsset} {title} descartado por "+is_ko)
                 continue
 
             genres = self.__get_genres(ficha, metad)
@@ -152,20 +138,40 @@ class Rtve(Web):
                 genres=tuple(genres),
                 imdbId=idImdb,
                 imdbRate=to_int_float(imdbRate),
-                imdbVotes=imdbVotes
+                imdbVotes=imdbVotes,
+                wiki=dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
             )
             films.add(f)
         return tuple(films)
 
-    def __is_serie(self, imdb: str, metadata: dict):
+    def __is_ko(self, ficha: dict, imdb: str, metadata: dict):
+        type_name: str = dict_walk(ficha, 'type/name', instanceof=str)
+        sbty_name: str = dict_walk(ficha, 'subType/name', instanceof=(str, type(None)))
+        if type_name in ('Avance', 'Fragmento'):
+            return f"type/name={type_name} subType/name={sbty_name}"
+        mainTopic: str = dict_walk(ficha, 'mainTopic', instanceof=str)
+        if self.__is_ko_mainTopic(mainTopic):
+            return f"mainTopic={mainTopic}"
+        genres = self.__get_genres(ficha, None)
+        if "Playz joven" in genres:
+            return f"genero={', '.join(genres)}"
+        if ficha.get("temporadas"):
+            return "temporadas!=null"
         if imdb is None:
-            return False
-        if metadata:
-            return metadata.get("Type") == "episode"
-        soup = self.get(f"https://www.imdb.com/es-es/title/{imdb}")
-        if soup.find("a", string=re.compile(r"^\s*Todos\s*los\s*episodios\s*$", flags=re.I)):
-            return True
-        return False
+            return None
+        if not isinstance(metadata, dict):
+            soup = self.get_cached_soup(f"https://www.imdb.com/es-es/title/{imdb}")
+            if soup.find("a", string=re.compile(r"^\s*Todos\s*los\s*episodios\s*$", flags=re.I)):
+                return "imdb.web = Todos los episodios"
+            return None
+        if metadata.get("Type") in ("episode", "series"):
+            return "Type="+metadata['Type']
+        if re_or(metadata.get('Title'), "^Ein Sommer (an|auf)", flags=re.I):
+            return "Title=Ein Sommer auf..."
+        #imdbRating = max(ficha.get('imdbRate') or 0, metadata.get('imdbRating') or 0)
+        #if imdbRating < 4 and re_or(ficha.get('longTitle'), f"^Sesión de tarde \- "):
+        #    return f"imdbRating={imdbRating} longTitle=Sesión de tarde..."
+        return None
 
     def __is_ko_mainTopic(self, mainTopic: str):
         if mainTopic.startswith("Televisión/Programas de TVE/"):
@@ -238,7 +244,10 @@ class Rtve(Web):
             return ("Drama", )
         mg = dict_walk(metadata, 'Genre', instanceof=(list, type(None)))
         if mg:
-            return tuple(mg)
+            gnr = tuple(mg)
+            if "Horror" in gnr:
+                return ("Terror", )
+            return gnr
         return tuple()
 
     def __get_description(self, url: str, ficha: dict):
@@ -301,7 +310,7 @@ class Rtve(Web):
     @Cache("rec/rtve/{}.json")
     def get_ficha(self, id: int) -> dict[str, Any]:
         js = self.json(f"https://api.rtve.es/api/videos/{id}.json")
-        return _clean_js(js['page']['items'][0])
+        return mapdict(_clean_js, js['page']['items'][0])
 
 
 if __name__ == "__main__":

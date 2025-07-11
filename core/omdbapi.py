@@ -1,7 +1,7 @@
 from requests import Session
 from os import environ
 import logging
-from core.util import tp_split, re_or
+from core.util import tp_split, re_or, mapdict
 from core.cache import Cache
 from functools import cache
 import re
@@ -9,7 +9,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def _clean_js(obj: list | dict | str, k: str = None):
+def _clean_js(k: str, obj):
     if isinstance(obj, str):
         obj = obj.strip()
         if obj in ("", "N/A"):
@@ -17,7 +17,7 @@ def _clean_js(obj: list | dict | str, k: str = None):
         if obj in ("True", "False"):
             return obj == "True"
         if isinstance(k, str):
-            if obj.isdigit() and k in ('Year', "imdbRating", ):
+            if obj.isdigit() and k in ('Year', "imdbRating", "totalSeasons"):
                 return int(obj)
             if k in ("Director", "Writer", "Actors", "Genre"):
                 return list(tp_split(r",", obj))
@@ -26,14 +26,8 @@ def _clean_js(obj: list | dict | str, k: str = None):
             if re.match(r"^\d+[\.\d,]*$", obj) and k in ("imdbVotes", ):
                 return int(obj.replace(",", ""))
         return obj
-    if isinstance(obj, list):
-        return [_clean_js(i) for i in obj]
-    if isinstance(obj, dict):
-        for k, v in list(obj.items()):
-            v = _clean_js(v, k=k)
-            if k in ("imdbRating", ) and isinstance(v, (int, float)) and v<0:
-                v = None
-            obj[k] = v
+    if isinstance(obj, (int, float)) and obj < 0 and k in ("imdbRating", ):
+        return None
     return obj
 
 
@@ -50,7 +44,7 @@ class OmdbApi:
             return None
         r = self.__s.get(self.__url+id)
         js = r.json()
-        js = _clean_js(js)
+        js = mapdict(_clean_js, js)
         if js.get("Error"):
             logger.warning(f"OmdbApi: {id} = {js['Error']}")
             return None
@@ -105,6 +99,8 @@ class OmdbApi:
             return "tt37384074"
         if re_or(title, r"^El traje", flags=re.I) and year == 2002:
             return "tt0340407"
+        if re_or(title, r"^Corazón roto. Fuga a Italia", flags=re.I) and year == 2023:
+            return "tt33992356"
 
 
 OMDB = OmdbApi()

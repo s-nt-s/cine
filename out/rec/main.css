@@ -121,6 +121,23 @@ a.imdb {
   font-size: 0.9em;
   letter-spacing: 0.05em;
 }
+a.wiki {
+  display: inline-block;
+  background: white;
+  aspect-ratio: 1 / 1;
+  min-width: 1em;
+  padding: 0.2em;
+  font-size: 0.9em;
+  color: black;
+  font-weight: bold;
+  font-family: "Georgia", serif;
+  text-align: center;
+  border: 1px solid black;
+  border-radius: 4px;
+  text-decoration: none;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+  transition: background 0.3s;
+}
 
 span.genre {
   display: inline-block;

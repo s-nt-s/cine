@@ -198,6 +198,25 @@ function getRanges() {
 
 function ifLocal() {
   if (!isLocal) return;
+  const mkA = (url) => {
+    const a = document.createElement("a");
+    const spl = url.split("/");
+    a.textContent = spl[spl.length-1];
+    a.href = url;
+    return a;
+  }
+  const gId = (s) => {
+    while (s.endsWith("/")) s = s.substring(0, s.length-1);
+    const spl = s.split("/");
+    return spl[spl.length-1];
+  }
+  document.querySelectorAll("div.film").forEach(i=>{
+    const p  = i.querySelector("p");
+    const imdb = i.querySelector("a.imdb");
+    const rtve = i.querySelector("a.title");
+    if (rtve) p.append(" ", mkA(`../rec/rtve/${gId(rtve.href)}.json`));
+    if (imdb) p.append(" ", mkA(`../rec/omdbapi/${gId(imdb.href)}.json`));
+  })
 }
 
 

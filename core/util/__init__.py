@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Union, Set, Tuple, Optional, Type
+from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any
 from bs4 import Tag, BeautifulSoup
 from minify_html import minify
 import unicodedata
@@ -500,9 +500,25 @@ def tp_split(sep: str, s:str) -> tuple[str, ...]:
     return tuple(uniq(*spl))
 
 
-def to_int_float(i: str|int|float|None):
+def to_int_float(i: str | int | float | None):
     if i is None:
         return None
     f = float(i)
     i = int(i)
-    return i if f==i else f
+    return i if f == i else f
+
+
+def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = None):
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float)):
+        bak = None
+        while bak != obj:
+            bak = obj
+            obj = fnc(k, obj)
+        return obj
+    if isinstance(obj, list):
+        return list(map(lambda x: mapdict(fnc, x, k=k), obj))
+    if isinstance(obj, dict):
+        return {k: mapdict(fnc, v, k=k) for k, v in obj.items()}
+    return obj

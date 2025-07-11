@@ -18,6 +18,7 @@ class Film(NamedTuple):
     imdbId: str
     imdbRate: float
     imdbVotes: int
+    wiki: str
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]
