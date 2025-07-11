@@ -1,0 +1,5 @@
+CREATE TABLE M3U8 (
+    url TEXT PRIMARY KEY,
+    m3u8 TEXT NOT NULL,
+    updated TIMESTAMPTZ DEFAULT now()
+);

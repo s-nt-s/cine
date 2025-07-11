@@ -1,6 +1,16 @@
 const isLocal = ["", "localhost"].includes(document.location.hostname);
 const $$ = (slc) => Array.from(document.querySelectorAll(slc));
+const DB = new Db();
 
+function chunkArray(arr, chunkSize) {
+  const result = [];
+  let chunk;
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    chunk = arr.slice(i, i + chunkSize);
+    if (chunk.length) result.push(chunk);
+  }
+  return result;
+}
 
 class FormQuery {
   static ALIAS = Object.freeze({})
@@ -211,7 +221,7 @@ function ifLocal() {
     return spl[spl.length-1];
   }
   document.querySelectorAll("div.film").forEach(i=>{
-    const p  = i.querySelector("p");
+    const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
     if (rtve) p.append(" ", mkA(`../rec/rtve/${gId(rtve.href)}.json`));
@@ -242,6 +252,21 @@ document.addEventListener(
       i.addEventListener("change", onChange);
     });
     onChange();
+    const urls = $$("a.title").map(i=>i.href);
+    chunkArray(urls, 100).forEach(chunk=>{
+      DB.selectTableWhere('m3u8', 'url', ...chunk).then((arr) => {
+        arr.forEach(o=>{
+          const a = document.querySelector(`a[href="${o.url}"]`);
+          if (a) a.addEventListener('click', (event)=>{
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            mkVideo(o.m3u8, true);
+            return false;
+          });
+        })
+      });
+    })
   },
   false
 );
