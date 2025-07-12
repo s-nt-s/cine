@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import yt_dlp
 from yt_dlp.utils import YoutubeDLError
 from functools import cache
