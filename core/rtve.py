@@ -168,8 +168,9 @@ class Rtve(Web):
         if metadata.get('Awards') is None and 'Spain' not in metadata.get('Country', []) and "Documental" not in genres:
             if m_type in ("tvmovie", "episode", "series"):
                 return "Type="+m_type
-        #if re_or(metadata.get('Title'), "^Ein Sommer (an|auf)", flags=re.I):
-        #   return "Title=Ein Sommer auf..."
+        for t in (metadata.get('Title'), ficha.get('title')):
+            if re_or(t, "^Ein Sommer (an|auf)", r"^Corazón roto\. ", flags=re.I):
+                return "Title="+metadata.get('Title')
         #imdbRating = max(ficha.get('imdbRate') or 0, metadata.get('imdbRating') or 0)
         #if imdbRating < 4 and re_or(ficha.get('longTitle'), f"^Sesión de tarde \- "):
         #    return f"imdbRating={imdbRating} longTitle=Sesión de tarde..."
