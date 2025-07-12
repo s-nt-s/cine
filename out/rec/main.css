@@ -223,6 +223,8 @@ span.duration {
 }
 
 img.pais {
-  height: 1em;
-  vertical-align: bottom;
+  height: 0.7em;
+}
+abbr.pais {
+  text-decoration: none;
 }
