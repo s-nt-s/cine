@@ -53,7 +53,7 @@ def _to_json(n: Tag, attr: str):
     if len(val) == 0:
         return None
     obj = json.loads(val)
-    return mapdict(_clean_js, obj)
+    return mapdict(_clean_js, obj, compact=True)
 
 
 class Rtve(Web):
@@ -164,10 +164,12 @@ class Rtve(Web):
             if soup.find("a", string=re.compile(r"^\s*Todos\s*los\s*episodios\s*$", flags=re.I)):
                 return "imdb.web = Todos los episodios"
             return None
-        if metadata.get("Type") in ("episode", "series"):
-            return "Type="+metadata['Type']
-        if re_or(metadata.get('Title'), "^Ein Sommer (an|auf)", flags=re.I):
-            return "Title=Ein Sommer auf..."
+        m_type = metadata.get("Type")
+        if metadata.get('Awards') is None and 'Spain' not in metadata.get('Country', []) and "Documental" not in genres:
+            if m_type in ("tvmovie", "episode", "series"):
+                return "Type="+m_type
+        #if re_or(metadata.get('Title'), "^Ein Sommer (an|auf)", flags=re.I):
+        #   return "Title=Ein Sommer auf..."
         #imdbRating = max(ficha.get('imdbRate') or 0, metadata.get('imdbRating') or 0)
         #if imdbRating < 4 and re_or(ficha.get('longTitle'), f"^Sesión de tarde \- "):
         #    return f"imdbRating={imdbRating} longTitle=Sesión de tarde..."
@@ -310,7 +312,7 @@ class Rtve(Web):
     @Cache("rec/rtve/{}.json")
     def get_ficha(self, id: int) -> dict[str, Any]:
         js = self.json(f"https://api.rtve.es/api/videos/{id}.json")
-        return mapdict(_clean_js, js['page']['items'][0])
+        return mapdict(_clean_js, js['page']['items'][0], compact=True)
 
 
 if __name__ == "__main__":

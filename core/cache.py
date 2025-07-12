@@ -8,6 +8,7 @@ from .filemanager import FM
 
 logger = logging.getLogger(__name__)
 
+
 def myhash(s: str) -> str:
     return hashlib.sha256(s.encode('utf-8')).hexdigest()
 

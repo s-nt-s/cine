@@ -283,7 +283,7 @@ function mkVideo(url, fireByUser) {
   }
   video.controls = true;
   video.autoplay = true;
-  video.playsInline = false;
+  video.playsInline = true;
   video.muted = !fireByUser;
   if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = url;

@@ -508,7 +508,7 @@ def to_int_float(i: str | int | float | None):
     return i if f == i else f
 
 
-def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = None):
+def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = None, compact=False):
     if obj is None:
         return None
     if isinstance(obj, (str, int, float)):
@@ -518,7 +518,19 @@ def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = Non
             obj = fnc(k, obj)
         return obj
     if isinstance(obj, list):
-        return list(map(lambda x: mapdict(fnc, x, k=k), obj))
+        obj = list(map(lambda x: mapdict(fnc, x, k=k, compact=compact), obj))
+        if compact:
+            obj = [i for i in obj if i is not None]
+            if len(obj) == 0:
+                obj = None
+        return obj
     if isinstance(obj, dict):
-        return {k: mapdict(fnc, v, k=k) for k, v in obj.items()}
+        obj = {k: mapdict(fnc, v, k=k, compact=compact) for k, v in obj.items()}
+        if compact:
+            for k, v in list(obj.items()):
+                if v is None:
+                    del obj[k]
+            if len(obj) == 0:
+                obj = None
+        return obj
     return obj

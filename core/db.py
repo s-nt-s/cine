@@ -4,6 +4,11 @@ from typing import Optional, Any, Tuple, Union
 from functools import cache
 from os import environ
 from datetime import datetime, timezone
+import logging
+from functools import update_wrapper
+from psycopg2.extras import Json as DBJson
+
+logger = logging.getLogger()
 
 
 class EmptyInsertException(psycopg2.OperationalError):
@@ -135,3 +140,43 @@ class Database:
         except Exception:
             self.con.rollback()
             raise
+
+
+class DBCache:
+    def __init__(self, select: str, insert: str, kwself=None, loglevel=None):
+        self.__select = select
+        self.__insert = insert
+        self.__func = None
+        self.__loglevel = loglevel
+
+    def read(self, *args):
+        with Database() as db:
+            return db.one(self.__select, *args)
+
+    def save(self, data, *args):
+        with Database() as db:
+            if isinstance(data, (list, dict)):
+                data = DBJson(data)
+            return db.execute(self.__insert, args + (data, ))
+
+    def log(self, txt):
+        if self.__loglevel is not None:
+            logger.log(self.__loglevel, txt)
+
+    def callCache(self, slf, *args):
+        data = self.read(*args)
+        if data is not None:
+            return data
+        data = self.__func(slf, *args)
+        if data is not None:
+            self.save(data, *args)
+        return data
+
+    def __call__(self, func):
+        def callCache(*args):
+            return self.callCache(*args)
+
+        update_wrapper(callCache, func)
+        self.__func = func
+        setattr(callCache, "__cache_obj__", self)
+        return callCache

@@ -70,4 +70,4 @@ if __name__ == "__main__":
         done = db.to_tuple("SELECT url FROM M3U8 WHERE updated > NOW() - INTERVAL '2 days'")
         urls = sorted(set(urls).difference(done))
         for k, v in safe_get_m3u8(*urls).items():
-            db.insert("M3U8", url=k, m3u8=v, tail='ON CONFLICT (url) DO UPDATE SET m3u8 = EXCLUDED.m3u8')
+            db.insert("M3U8", url=k, m3u8=v, tail='ON CONFLICT (url) DO UPDATE SET m3u8 = EXCLUDED.m3u8, updated=now()')

@@ -55,6 +55,11 @@ default_headers = {
 }
 
 
+def find_by_text(soup: Tag, tag: str, text: str):
+    re_text = r"\s+".join(map(re.escape, text.split()))
+    return soup.find(tag, string=re.compile(r"\s*"+re_text+"\s*", flags=re.I))
+
+
 def get_query(url):
     q = urlsplit(url)
     q = parse_qsl(q.query)

@@ -197,19 +197,13 @@ span.duration {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding-bottom: 2em;
   box-sizing: border-box;
-}
-
-#video video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  padding-top: 2em;
 }
 
 #video button {
+  top: 0;
   position: fixed;
-  bottom: 0;
   left: 0;
   width: 100vw;
   height: 2em;
@@ -221,3 +215,10 @@ span.duration {
   cursor: pointer;
   z-index: 10;
 }
+
+#video video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+

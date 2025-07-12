@@ -5,6 +5,8 @@ from core.util import tp_split, re_or, mapdict
 from core.cache import Cache
 from functools import cache
 import re
+from core.db import DBCache
+from core.web import buildSoup, get_text, WEB, find_by_text
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +18,14 @@ def _clean_js(k: str, obj):
             return None
         if obj in ("True", "False"):
             return obj == "True"
-        if isinstance(k, str):
-            if obj.isdigit() and k in ('Year', "imdbRating", "totalSeasons"):
-                return int(obj)
-            if k in ("Director", "Writer", "Actors", "Genre"):
-                return list(tp_split(r",", obj))
-            if re.match(r"^\d+\.\d+$", obj) and k in ("imdbRating", ):
-                return float(obj)
-            if re.match(r"^\d+[\.\d,]*$", obj) and k in ("imdbVotes", ):
-                return int(obj.replace(",", ""))
+        if obj.isdigit() and k in ('Year', "imdbRating", "totalSeasons"):
+            return int(obj)
+        if k in ("Director", "Writer", "Actors", "Genre", "Country"):
+            return list(tp_split(r",", obj))
+        if re.match(r"^\d+\.\d+$", obj) and k in ("imdbRating", ):
+            return float(obj)
+        if re.match(r"^\d+[\.\d,]*$", obj) and k in ("imdbVotes", ):
+            return int(obj.replace(",", ""))
         return obj
     if isinstance(obj, (int, float)) and obj < 0 and k in ("imdbRating", ):
         return None
@@ -34,21 +35,78 @@ def _clean_js(k: str, obj):
 class OmdbApi:
     def __init__(self):
         key = environ['OMDBAPI_KEY']
-        self.__url = f"http://www.omdbapi.com/?apikey={key}&i="
+        self.__json = f"http://www.omdbapi.com/?apikey={key}&i="
+        self.__html = "https://www.imdb.com/es-es/title/"
         self.__s = Session()
+
+    @DBCache(
+        select="select json from OMBDAPI where id = %s and updated > NOW() - INTERVAL '30 days'",
+        insert="insert into OMBDAPI (id, json) values (%s, %s) ON CONFLICT (id) DO UPDATE SET json = EXCLUDED.json, updated=now()"
+    )
+    def __get_json(self, id: str):
+        r = self.__s.get(self.__json+id)
+        js = r.json()
+        return js
 
     @cache
     @Cache("rec/omdbapi/{}.json")
     def get(self, id: str):
         if id in (None, ""):
             return None
-        r = self.__s.get(self.__url+id)
-        js = r.json()
-        js = mapdict(_clean_js, js)
-        if js.get("Error"):
+        js = self.__get_json(id)
+        js = mapdict(_clean_js, js, compact=True)
+        isError = js.get("Error")
+        if isError:
             logger.warning(f"OmdbApi: {id} = {js['Error']}")
+        if self.__need_info(js):
+            soup_js = self.__get_from_html(id)
+            if isError:
+                return soup_js
+            if soup_js is None:
+                return js
+            for k, v in soup_js.items():
+                val = js.get(k)
+                if k in ('Type', ) or (val is None or (isinstance(v, (int, float)) and isinstance(val, (int, float)) and val<v)):
+                    js[k] = v
+        return js
+
+    def __need_info(self, js: dict):
+        if js.get("Error"):
+            return True
+        if not isinstance(js.get('imdbRating'), (float, int)):
+            return True
+        if not isinstance(js.get("imdbVotes"), (int, float)):
+            return True
+        if set(('France', 'Germany')).intersection(js.get('Country', set())):
+            return True
+        return False
+
+    def __get_from_html(self, id: str):
+        js = dict()
+        url = f"{self.__html}{id}"
+        soup = buildSoup(url, self.__get_html(url))
+        votes = get_text(soup.select_one('a[aria-label="Ver puntuaciones de usuarios"]'))
+        if votes is not None:
+            imdbRating, imdbVotes = votes.replace("/10", " ").replace(" mil", "000").split()
+            js["imdbRating"] = float(imdbRating.replace(",", "."))
+            js["imdbVotes"] = int(imdbVotes.replace(",", ""))
+        if find_by_text(soup, "a", "Todos los episodios"):
+            js['Type'] = 'episode'
+        if find_by_text(soup, "li", "Película de TV"):
+            js['Type'] = 'tvmovie'
+
+        js = {k: v for k, v in js.items() if v is not None}
+        if len(js) == 0:
             return None
         return js
+
+    @DBCache(
+        select="select txt from URL_TXT where url = %s and updated > NOW() - INTERVAL '10 days'",
+        insert="insert into URL_TXT (url, txt) values (%s, %s) ON CONFLICT (url) DO UPDATE SET txt = EXCLUDED.txt, updated=now()"
+    )
+    def __get_html(self, url):
+        soup = WEB.get_cached_soup(url)
+        return str(soup)
 
     def get_id(self, title: str, year: int):
         if re_or(title, "^Almodóvar, todo sobre ellas", flags=re.I):
