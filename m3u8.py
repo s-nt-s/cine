@@ -5,6 +5,9 @@ import logging
 import requests
 from os import environ
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,

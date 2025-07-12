@@ -257,7 +257,8 @@ document.addEventListener(
       DB.selectTableWhere('m3u8', 'url', ...chunk).then((arr) => {
         arr.forEach(o=>{
           const a = document.querySelector(`a[href="${o.url}"]`);
-          if (a) a.addEventListener('click', (event)=>{
+          if (!a) return;
+          a.addEventListener('click', (event)=>{
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
