@@ -222,3 +222,7 @@ span.duration {
   object-fit: contain;
 }
 
+img.pais {
+  height: 1em;
+  vertical-align: bottom;
+}

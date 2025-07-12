@@ -44,7 +44,8 @@
         <h1 style="display: none">{{f.title}}</h1>
         <img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy"/>
         <div>
-          <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdbId%}<a class="imdb" href="https://www.imdb.com/es-es/title/{{f.imdbId}}">IMDb{%if f.imdbRate%} <span class="imdbRate" title="{{f.imdbRate}} sobre 10{%if f.imdbVotes%} en base a {{f.imdbVotes}} votos{%endif%}">{{f.imdbRate}}</span>{%endif%}</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}<span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span></p>
+          <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdbId%}<a class="imdb" href="https://www.imdb.com/es-es/title/{{f.imdbId}}">IMDb{%if f.imdbRate%} <span class="imdbRate" title="{{f.imdbRate}} sobre 10{%if f.imdbVotes%} en base a {{f.imdbVotes}} votos{%endif%}">{{f.imdbRate}}</span>{%endif%}</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}</p>
+          <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for c, n in f.country%} <img src="https://flagcdn.com/{{c}}.svg" class="pais {{c|simplify}}" title="{{n}}" alt="{{n}}"/>{%endfor%}</p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>

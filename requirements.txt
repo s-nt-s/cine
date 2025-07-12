@@ -13,3 +13,5 @@ ics==0.7.2
 psycopg2-binary==2.9.10
 yt-dlp==2025.6.30
 python-dotenv==1.1.1
+pycountry==24.6.1
+babel==2.17.0

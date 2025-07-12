@@ -12,10 +12,50 @@ from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float
 from core.film import Film
 from core.omdbapi import OMDB
 import re
-
+import pycountry
+from babel import Locale
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
+LOCALE = Locale('es')
+
+
+def search_country(name):
+    c = pycountry.countries.get(name=name)
+    if c is not None:
+        return c
+    for country in pycountry.countries:
+        if country.name.lower() == name.lower():
+            return country
+        if hasattr(country, 'official_name') and country.official_name.lower() == name.lower():
+            return country
+    alias = {
+        "russia": "Russian Federation",
+        "usa": "United States",
+        "uk": "United Kingdom",
+        "south korea": "Korea, Republic of",
+        "north korea": "Korea, Democratic People's Republic of",
+        "iran": "Iran, Islamic Republic of",
+        "syria": "Syrian Arab Republic",
+        "czech republic": "Czechia",
+        "west germany": "Germany",
+    }.get(name.lower())
+    if alias:
+        return search_country(alias)
+    return None
+
+
+def to_country(s: str):
+    if s == "Venezuela":
+        return ("ve", "Venezuela")
+    if s == "Bolivia":
+        return ("bo", "Bolivia")
+    if s == "Turkey":
+        return ("tr", "Turquía")
+    c = search_country(name=s)
+    cod: str = c.alpha_2
+    name = LOCALE.territories.get(cod)
+    return (cod.lower(), name or s)
 
 
 def _clean_js(k: str, obj: list | dict | str):
@@ -127,7 +167,6 @@ class Rtve(Web):
                 img=img,
                 program=dict_walk(ficha, 'programInfo/title', instanceof=(str, type(None))),
                 lang=dict_walk(ficha, 'language', instanceof=str),
-                country=dict_walk(ficha, 'country', instanceof=str),
                 description=self.__get_description(url, ficha),
                 year=year,
                 expiration=_g_date(ficha, 'expirationDate'),
@@ -140,6 +179,9 @@ class Rtve(Web):
                 imdbRate=to_int_float(imdbRate),
                 imdbVotes=imdbVotes,
                 wiki=dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
+                country=tuple(
+                    map(to_country, dict_walk(metad, 'Country', instanceof=(list, type(None))) or [])
+                )
             )
             films.add(f)
         return tuple(films)
