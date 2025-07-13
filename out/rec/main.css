@@ -243,3 +243,19 @@ abbr.pais {
   text-decoration: none;
   border-radius: 4px;
 }
+a:has(img) {
+  text-decoration: none;
+}
+
+body.cuadricula #films *:not(img):not(:has(img)) {
+  display: none !important;
+}
+body.cuadricula #films div {
+  display: inline;
+}
+body.cuadricula #films img {
+  height: 200px;
+  width: 140px;
+  margin: 5px;
+  border: 1px solid grey;
+}

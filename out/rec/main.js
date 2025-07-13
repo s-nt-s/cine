@@ -38,8 +38,9 @@ class FormQuery {
     const form = FormQuery.form();
     const qr = [];
     Object.entries(form).forEach(([k, v]) => {
-      if (k == "order") {
-        if (FormQuery.ORDER.includes(v)) qr.push(v);
+      if (FormQuery.DEF_FLAGS.includes(v)) return;
+      if (FormQuery.FLAGS.includes(v)) {
+        qr.push(v);
         return;
       }
       if (typeof v === "object" && Object.keys(v).length === 0) return;
@@ -125,7 +126,12 @@ class FormQuery {
     if (tmp.length == 0) return [null, null];
     if (tmp.length > 2 || tmp[0].length == 0) return [null, null];
     const k = tmp[0];
-    if (FormQuery.ORDER.includes(k)) return ["order", k];
+    if (FormQuery.DEF_FLAGS.includes(k) || FormQuery.FLAGS.includes(k)) {
+      const opt = document.querySelector(
+        'select option[value="' + k + '"]'
+      );
+      return [opt[0].closest("select[id]").id, k];
+    }
     if (!isNaN(Number(k))) return [null, null];
     if (tmp.length == 1) {
       const opt = document.querySelectorAll(
@@ -231,10 +237,18 @@ function ifLocal() {
 
 
 function setOrder() {
-  const def_order = $$("#order option").filter(o => o.getAttribute("selected") != null)[0].value;
-  const div = document.getElementById("films");
-  div.setAttribute("data-order", def_order);
-  FormQuery.ORDER = $$("#order option[value]").flatMap(i=>[null, "", def_order].includes(i.value)?[]:i.value);
+  const flags = new Set();
+  const default_flags = new Set();
+  document.querySelectorAll('select[data-type="flag"]').forEach((s) => {
+    const arr_options = Array.from(s.options);
+    const defVal = arr_options.filter(o => o.getAttribute("selected") != null)[0].value;
+    s.setAttribute("data-current", defVal);
+    default_flags.add(defVal);
+    const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
+    flags.add(...vals);
+  });
+  FormQuery.FLAGS = Object.freeze(Array.from(flags));
+  FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
 }
 
 
@@ -258,12 +272,12 @@ document.addEventListener(
         arr.forEach(o=>{
           const a = document.querySelector(`a[href="${o.url}"]`);
           if (!a) return;
+          const m3u8 = o.m3u8;
           a.addEventListener('click', (event)=>{
-            if (mkVideo(o.m3u8, true) == null) return;
+            if (mkVideo(m3u8, true) == null) return;
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
-            mkVideo(o.m3u8, true);
           });
         })
       });
@@ -321,13 +335,28 @@ function mkVideo(url, fireByUser) {
   return video;
 }
 
+function ifChange(form, id, fnc) {
+  const o = document.getElementById(id);
+  const newVal = form[id];
+  const oldVal = o.getAttribute("data-current");
+  if (form[id] == oldVal) return;
+  console.log(id, oldVal, "->", newVal);
+  fnc(newVal, oldVal);
+  o.setAttribute("data-current", newVal);
+}
+
+
 function onChange() {
   const div = document.getElementById("films");
   const form = FormQuery.form();
-  if (form.order != div.getAttribute("data-order")) {
-    console.log("order", div.getAttribute("data-order"), "->", form.order);
-    ORDER.get(form.order).forEach(i => div.append(document.getElementById(i)));
-    div.setAttribute("data-order", form.order);
-  }
+
+  ifChange(form, "view", (newVal, oldVal) => {
+    document.body.classList.remove(oldVal);
+    document.body.classList.add(newVal);
+  });
+  ifChange(form, "order", (newVal, oldVal) => {
+    ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
+  });
+
   FormQuery.form_to_query();
 }

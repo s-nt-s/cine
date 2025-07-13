@@ -25,24 +25,28 @@
   {% include "header.html" %}
   <main>
     <p>
-        <label for="order">Ordenar por
-          <select id="order">
-            <option value="publicacion" selected>fecha de publicación</option>
-            <option value="expiracion">fecha fin de disponibilidad</option>
-            <option value="duracion">duración</option>
-            <option value="estreno">año de estreno</option>
-            <option value="titulo">título</option>
-            <option value="director">director/a</option>
-            <option value="genero">genero</option>
-            <option value="imdb">puntuación en IMDb</option>
-          </select>
-        </label>
+        <label for="order">Ordenar por</label>
+        <select id="order" data-type="flag">
+          <option value="publicacion" selected>fecha de publicación</option>
+          <option value="expiracion">fecha fin de disponibilidad</option>
+          <option value="duracion">duración</option>
+          <option value="estreno">año de estreno</option>
+          <option value="titulo">título</option>
+          <option value="director">director/a</option>
+          <option value="genero">genero</option>
+          <option value="imdb">puntuación en IMDb</option>
+        </select>
+        <label for="view">Ver</label>
+        <select id="view" data-type="flag">
+          <option value="lista" selected>lista</option>
+          <option value="cuadricula">cuadricula</option>
+        </select>
     </p>
     <div id="films">
       {% for f in fl %}
       <div class="film" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
-        <img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy"/>
+        <a href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" loading="lazy" class="poster"/></a>
         <div>
           <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdbId%}<a class="imdb" href="https://www.imdb.com/es-es/title/{{f.imdbId}}">IMDb{%if f.imdbRate%} <span class="imdbRate" title="{{f.imdbRate}} sobre 10{%if f.imdbVotes%} en base a {{f.imdbVotes}} votos{%endif%}">{{f.imdbRate}}</span>{%endif%}</a> {%endif%}{%if f.filmaffinity%}<a title="Ficha filmaffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">F</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}</p>
           <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
