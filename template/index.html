@@ -47,7 +47,6 @@
       <div class="film" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
         <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
-        <div>
           <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdbId%}<a class="imdb" href="https://www.imdb.com/es-es/title/{{f.imdbId}}">IMDb{%if f.imdbRate%} <span class="imdbRate" title="{{f.imdbRate}} sobre 10{%if f.imdbVotes%} en base a {{f.imdbVotes}} votos{%endif%}">{{f.imdbRate}}</span>{%endif%}</a> {%endif%}{%if f.filmaffinity%}<a title="Ficha filmaffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">F</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}</p>
           <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
           <p>
@@ -58,7 +57,6 @@
           {% if f.expiration %}
           <!--p>Disponible hasta <span class="expiration">{{f.expiration}}</span></p-->
           {% endif %}
-         </div>
       </div>
       {% endfor %}
     </div>

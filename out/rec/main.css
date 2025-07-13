@@ -35,57 +35,6 @@ header a, footer a {
   color: inherit;
 }
 
-div.film {
-  overflow: hidden;
-  margin-bottom: 0.3em;
-  display: block;
-}
-div.film > a:has(img) {
-  float: left;
-  margin-right: 1em;
-  margin-bottom: 0.5em;
-}
-div.film > div > p:first-child {
-  margin-top: 0;
-}
-
-
-sup a {
-  text-decoration: none;
-}
-span.tag {
-  white-space: nowrap;
-  font-size: 0.70em;
-}
-.chkhideshow > span {
-  min-width: 12em;
-  display: inline-block;
-}
-.lang > span {
-  min-width: 20em;
-  display: inline-block;
-}
-fieldset {
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-input[type=number], select[data-type=number] option {
-  width: 5em;
-  text-align: right;
-}
-fieldset.rangos label span {
-  display: inline-block;
-  min-width: 5em;
-}
-a.title {
-  text-decoration: none;
-}
-
-.film.off {
-  display: none;
-}
-
-
 header a.logo {
   text-decoration: none;
 }
@@ -99,6 +48,20 @@ header a.logo img {
 header a:not(:first-of-type) {
   border-left: 1px solid white;
   padding-left: 5px;
+}
+
+div.film {
+  overflow: hidden;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  display: block;
+}
+div.film > p:first-of-type {
+  margin-top: 0;
+}
+
+a.title {
+  text-decoration: none;
 }
 
 span.expiration {
@@ -242,8 +205,14 @@ abbr.pais {
   text-decoration: none;
   border-radius: 4px;
 }
-a:has(img) {
-  text-decoration: none;
+
+div.film > a.poster {
+  float: left;
+  margin-right: 0.7em;
+  margin-bottom: 0.5em;
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 0;
 }
 
 body.cuadricula main div.film {
@@ -262,8 +231,12 @@ body.cuadricula main div.film.expand {
 }
 body.cuadricula main div.film > a.poster {
   display: block;
-  margin: 0 !important;
-  line-height: 0;
+  margin-right: 0;
+}
+body.cuadricula main div.film.expand > a.poster {
+  display: inline;
+  margin-right: 0.7em !important;
+  margin-bottom: 0.5em !important;
 }
 body.cuadricula main div.film > a.poster img {
   height: 200px;
@@ -273,6 +246,4 @@ body.cuadricula main div.film > a.poster img {
 body.cuadricula main div.film.expand > a.poster img {
   height: 100px;
   width: 70px;
-  margin-right: 5px;
-  margin-bottom: 5px;
 }
