@@ -13,6 +13,8 @@ from core.film import Film
 from core.omdbapi import OMDB
 import re
 from core.country import to_country
+from core.wiki import WIKI, WikiInfo
+
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
@@ -40,7 +42,8 @@ def _g_date(ficha: dict, k: str):
     if s is None:
         return None
     num = tuple(map(int, re.findall(r"\d+", s)))
-    return "{2:04d}-{1:02d}-{0:02d}".format(*num[:3])
+    d = "{2:04d}-{1:02d}-{0:02d} {3:02d}:{4:02d}:{5:02d}".format(*num)
+    return d
 
 
 def _to_json(n: Tag, attr: str):
@@ -119,6 +122,12 @@ class Rtve(Web):
                 year: int = dict_walk(metad, 'Year', instanceof=(int, type(None)))
 
             url = dict_walk(ficha, 'htmlUrl', instanceof=str)
+            wiki = WIKI.info_from_imdb(idImdb) or WikiInfo(url=None, country=tuple(), filmaffinity=None)
+            country = dict_walk(metad, 'Country', instanceof=(list, type(None)))
+            if not country:
+                country = wiki.country
+            elif wiki.country:
+                country = tuple(set(country).intersection(wiki.country)) or wiki.country
             f = Film(
                 source="rtve",
                 id=idAsset,
@@ -138,10 +147,9 @@ class Rtve(Web):
                 imdbId=idImdb,
                 imdbRate=to_int_float(imdbRate),
                 imdbVotes=imdbVotes,
-                wiki=dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
-                country=tuple(
-                    map(to_country, dict_walk(metad, 'Country', instanceof=(list, type(None))) or [])
-                )
+                wiki=wiki.url or dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
+                country=tuple(set(map(to_country, country))),
+                filmaffinity=wiki.filmaffinity
             )
             films.add(f)
         return tuple(films)
@@ -170,6 +178,8 @@ class Rtve(Web):
         if metadata.get('Awards') is None and 'Spain' not in metadata.get('Country', []) and "Documental" not in genres:
             if m_type in ("tvmovie", "episode", "series"):
                 return "Type="+m_type
+            if "TV Movies" in genres:
+                return "Genero=TV Movies"
         for t in (metadata.get('Title'), ficha.get('title')):
             if re_or(t, "^Ein Sommer (an|auf)", r"^Corazón roto\. ", flags=re.I):
                 return "Title="+metadata.get('Title')
@@ -231,6 +241,11 @@ class Rtve(Web):
             return ("Documental", )
         if re_or(mainTopic, r"Thriller"):
             return ("Suspense", )
+        meta_gnr = tuple(dict_walk(metadata, 'Genre', instanceof=(list, type(None))) or [])
+        if "Horror" in meta_gnr:
+            return ("Terror", )
+        if "Biography" in meta_gnr:
+            return ("Biográfico", )
         genres: set[str] = set()
         for g in (ficha.get("generos") or []):
             v = trim(g.get('subGeneroInf')) or trim(g.get('generoInf'))
@@ -247,13 +262,7 @@ class Rtve(Web):
             return tuple(genres)
         if re_or(ecort_content, "[dD]rama"):
             return ("Drama", )
-        mg = dict_walk(metadata, 'Genre', instanceof=(list, type(None)))
-        if mg:
-            gnr = tuple(mg)
-            if "Horror" in gnr:
-                return ("Terror", )
-            return gnr
-        return tuple()
+        return meta_gnr
 
     def __get_description(self, url: str, ficha: dict):
         arr = [i for i in map(
@@ -274,7 +283,7 @@ class Rtve(Web):
             if not txt:
                 n.extract()
                 continue
-            if re_or(txt, "^(Película )?[Dd]irigida por", "^Contenido disponible"):
+            if re_or(txt, "^(Película )?[Dd]irigida( y guionizada)? por", "^Contenido disponible", "^Este contenido está disponible"):
                 n.extract()
         return str(soup)
 
