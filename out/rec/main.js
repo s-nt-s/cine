@@ -259,11 +259,11 @@ document.addEventListener(
           const a = document.querySelector(`a[href="${o.url}"]`);
           if (!a) return;
           a.addEventListener('click', (event)=>{
+            if (mkVideo(o.m3u8, true) == null) return;
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
             mkVideo(o.m3u8, true);
-            return false;
           });
         })
       });
@@ -271,16 +271,21 @@ document.addEventListener(
   },
   false
 );
+
+function requestFullscreen (v) {
+  if (v.requestFullscreen) return v.requestFullscreen();
+  if (v.webkitRequestFullscreen) return v.webkitRequestFullscreen();
+  if (v.mozRequestFullScreen) return v.mozRequestFullScreen();
+  if (v.msRequestFullscreen) return v.msRequestFullscreen();
+}
+
 function mkVideo(url, fireByUser) {
   fireByUser = fireByUser===true;
   let div = document.getElementById("video");
   if (div) div.remove();
   if (url == null) return null;
   const video = document.createElement("video");
-  if (video==null) {
-    alert('Función no soportada');
-    return null;
-  }
+  if (video==null) return null;
   video.controls = true;
   video.autoplay = true;
   video.playsInline = true;
@@ -301,7 +306,9 @@ function mkVideo(url, fireByUser) {
   div.appendChild(video);
   div.appendChild(button);
   document.body.insertBefore(div, document.body.firstChild);
-  if (fireByUser) video.play();
+  if (fireByUser) video.play().then(() => {
+    requestFullscreen(video)
+  });
   else {
     const events = ['mousemove', 'keydown', 'click'];
     const onFirstUserInteraction = () => {

@@ -22,12 +22,14 @@ class WikiInfo(NamedTuple):
 class WikiApi:
     def __init__(self):
         self.__s = requests.Session()
+        # https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy
         self.__s.headers.update({
             "Accept": "application/sparql-results+json",
             'User-Agent': f'CineBoot/0.0 ({PAGE_URL}; {OWNER_MAIL})'
         })
 
     def query_sparql(self, query: str):
+        # https://query.wikidata.org/
         endpoint = "https://query.wikidata.org/sparql"
 
         r = self.__s.get(endpoint, params={"query": query})
