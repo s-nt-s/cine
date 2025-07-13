@@ -248,6 +248,8 @@ a:has(img) {
 
 body.cuadricula main div.film {
   display: inline-block;
+  margin: 5px;
+  padding: 0;
 }
 body.cuadricula main div.film:not(.expand) > * {
   display: none;
@@ -257,12 +259,11 @@ body.cuadricula main div.film.expand {
   max-width: 600px;
   overflow-y: auto;
   vertical-align: top;
-  margin: 0;
-  padding: 0;
 }
 body.cuadricula main div.film > a.poster {
   display: block;
   margin: 0 !important;
+  line-height: 0;
 }
 body.cuadricula main div.film > a.poster img {
   height: 200px;
@@ -274,11 +275,4 @@ body.cuadricula main div.film.expand > a.poster img {
   width: 70px;
   margin-right: 5px;
   margin-bottom: 5px;
-}
-div.film:fullscreen {
-  padding: 1em;;
-  display: block !important;
-  background: white !important;
-  width: 100vw;
-  height: 100vh;
 }
