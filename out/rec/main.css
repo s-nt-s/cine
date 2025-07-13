@@ -40,9 +40,8 @@ div.film {
   margin-bottom: 0.3em;
   display: block;
 }
-div.film > img {
+div.film > a:has(img) {
   float: left;
-  width: 150px;
   margin-right: 1em;
   margin-bottom: 0.5em;
 }
@@ -247,15 +246,39 @@ a:has(img) {
   text-decoration: none;
 }
 
-body.cuadricula #films *:not(img):not(:has(img)) {
-  display: none !important;
+body.cuadricula main div.film {
+  display: inline-block;
 }
-body.cuadricula #films div {
-  display: inline;
+body.cuadricula main div.film:not(.expand) > * {
+  display: none;
 }
-body.cuadricula #films img {
+body.cuadricula main div.film.expand {
+  height: 200px;
+  max-width: 600px;
+  overflow-y: auto;
+  vertical-align: top;
+  margin: 0;
+  padding: 0;
+}
+body.cuadricula main div.film > a.poster {
+  display: block;
+  margin: 0 !important;
+}
+body.cuadricula main div.film > a.poster img {
   height: 200px;
   width: 140px;
-  margin: 5px;
   border: 1px solid grey;
+}
+body.cuadricula main div.film.expand > a.poster img {
+  height: 100px;
+  width: 70px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+}
+div.film:fullscreen {
+  padding: 1em;;
+  display: block !important;
+  background: white !important;
+  width: 100vw;
+  height: 100vh;
 }

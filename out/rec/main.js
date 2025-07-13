@@ -266,18 +266,31 @@ document.addEventListener(
       i.addEventListener("change", onChange);
     });
     onChange();
+    document.querySelectorAll("a.poster").forEach((a) => {
+      a.addEventListener("click", (event) => {
+        if (!document.body.classList.contains("cuadricula")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        a.closest("div.film").classList.toggle("expand");
+      });
+    });
     const urls = $$("a.title").map(i=>i.href);
     chunkArray(urls, 100).forEach(chunk=>{
       DB.selectTableWhere('m3u8', 'url', ...chunk).then((arr) => {
         arr.forEach(o=>{
-          const a = document.querySelector(`a[href="${o.url}"]`);
-          if (!a) return;
-          const m3u8 = o.m3u8;
-          a.addEventListener('click', (event)=>{
-            if (mkVideo(m3u8, true) == null) return;
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
+           document.querySelectorAll(`a[href="${o.url}"]`).forEach(a=>{
+            const m3u8 = o.m3u8;
+            const isPoster = a.classList.contains("poster");
+            a.addEventListener('click', (event)=>{
+              //if (isPoster && document.body.classList.contains("cuadricula")) {
+              //  requestFullscreen(a.closest("div.film"));
+              //} else 
+              if (mkVideo(m3u8, true) == null) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation();
+            });
           });
         })
       });
