@@ -130,7 +130,7 @@ class FormQuery {
       const opt = document.querySelector(
         'select option[value="' + k + '"]'
       );
-      return [opt[0].closest("select[id]").id, k];
+      return [opt.closest("select[id]").id, k];
     }
     if (!isNaN(Number(k))) return [null, null];
     if (tmp.length == 1) {
@@ -245,7 +245,7 @@ function setOrder() {
     s.setAttribute("data-current", defVal);
     default_flags.add(defVal);
     const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
-    flags.add(...vals);
+    vals.forEach(x => flags.add(x));
   });
   FormQuery.FLAGS = Object.freeze(Array.from(flags));
   FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
