@@ -225,7 +225,7 @@ body.cuadricula main div.film:not(.expand) > * {
 }
 body.cuadricula main div.film.expand {
   height: 200px;
-  max-width: 600px;
+  max-width: 610px;
   overflow-y: auto;
   vertical-align: top;
 }
