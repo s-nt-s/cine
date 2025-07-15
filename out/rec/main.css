@@ -242,11 +242,10 @@ body.cuadricula main div.film.expand > a.poster {
   margin-bottom: 0.5em !important;
 }
 body.cuadricula main div.film > a.poster img {
-  height: 200px !important;
+  aspect-ratio: 7 / 10 !important;
   width: min(140px, calc(50vw - 1.5em)) !important;
   border: 1px solid grey;
 }
 body.cuadricula main div.film.expand > a.poster img {
-  height: 100px !important;
-  width: min(70px, calc(50vw - 1.5em)); !important;
+  width: min(70px, calc(50vw - 1.5em)) !important;
 }
