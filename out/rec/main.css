@@ -214,6 +214,9 @@ div.film > a.poster {
   margin-bottom: 0;
   line-height: 0;
 }
+div.film > a.poster > img {
+  max-width: min(150px, calc(50vw - 1.5em));
+}
 
 body.cuadricula main div.film {
   display: inline-block;
@@ -239,11 +242,11 @@ body.cuadricula main div.film.expand > a.poster {
   margin-bottom: 0.5em !important;
 }
 body.cuadricula main div.film > a.poster img {
-  height: 200px;
-  width: 140px;
+  height: 200px !important;
+  width: min(140px, calc(50vw - 1.5em)) !important;
   border: 1px solid grey;
 }
 body.cuadricula main div.film.expand > a.poster img {
-  height: 100px;
-  width: 70px;
+  height: 100px !important;
+  width: min(70px, calc(50vw - 1.5em)); !important;
 }
