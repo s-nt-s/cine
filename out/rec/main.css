@@ -243,9 +243,9 @@ body.cuadricula main div.film.expand > a.poster {
 }
 body.cuadricula main div.film > a.poster img {
   aspect-ratio: 7 / 10 !important;
-  width: min(140px, calc(50vw - 1.5em)) !important;
+  width: min(140px, calc(50vw - 1.5em - 10px)) !important;
   border: 1px solid grey;
 }
 body.cuadricula main div.film.expand > a.poster img {
-  width: min(70px, calc(50vw - 1.5em)) !important;
+  width: min(70px, calc(50vw - 1.5em - 10px)) !important;
 }
