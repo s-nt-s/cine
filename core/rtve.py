@@ -168,7 +168,7 @@ class Rtve(Web):
         if ficha.get("temporadas"):
             return "temporadas!=null"
         programType = dict_walk(ficha, 'programInfo/programType', instanceof=(str, type(None)))
-        if programType in ("Entrevistas", )
+        if programType in ("Entrevistas", ):
             return f"programType={programType}"
         if imdb is None:
             return None
