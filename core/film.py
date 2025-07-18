@@ -1,4 +1,5 @@
 from typing import NamedTuple
+from core.wiki import WikiUrl
 
 
 class IMDb(NamedTuple):
@@ -25,7 +26,6 @@ class IMDb(NamedTuple):
         return f"Ficha IMDb ({self.rate} sobre 10)"
 
 
-
 class Film(NamedTuple):
     source: str
     id: int
@@ -41,7 +41,7 @@ class Film(NamedTuple):
     publication: str
     duration: int
     imdb: IMDb
-    wiki: str
+    wiki: WikiUrl
     filmaffinity: str | None
     director: tuple[str, ...]
     casting: tuple[str, ...]

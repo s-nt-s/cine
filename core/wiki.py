@@ -7,11 +7,34 @@ from typing import NamedTuple, Any
 from functools import cache
 from os import environ
 import re
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
 PAGE_URL = environ['PAGE_URL']
 OWNER_MAIL = environ['OWNER_MAIL']
+
+
+class WikiUrl(NamedTuple):
+    url: str
+    lang_code: str
+    lang_label: str
+
+    def to_html(self) -> str:
+        cls = ["wiki"]
+        title = "Wikipedia"
+        if self.lang_label:
+            title += f" en {self.lang_label}"
+        elif self.lang_code:
+            title += f" ({self.lang_code})"
+        if self.lang_code:
+            cls.append("wiki_"+self.lang_code)
+        cls_str = ' '.join(cls)
+        html = f'<a class="{cls_str}" href="{self.url}" title="{title}"'
+        if self.lang_code:
+            html += f' hreflang="{self.lang_code}"'
+        html += '>W</a>'
+        return html
 
 
 class WikiInfo(NamedTuple):
@@ -33,10 +56,29 @@ class WikiApi:
         # https://query.wikidata.org/
         r = self.__s.get(
             "https://query.wikidata.org/sparql",
-            params={"query": query}
+            params={"query": dedent(query).strip()}
         )
         r.raise_for_status()
         return r.json()
+
+    def query_bindings(self, query: str) -> list[dict[str, Any]]:
+        data = self.query_sparql(query)
+        bindings = dict_walk(data, 'results/bindings', instanceof=list)
+        return bindings
+
+    @cache
+    def query_str(self, path: str, query: str) -> list[dict[str, Any]]:
+        count = dict()
+        while True:
+            dt = self.query_bindings(query)
+            i = dict_walk(dt, path, instanceof=(str, type(None)))
+            count[i] = count.get(i, 1) + 1
+            if count[i] > 2:
+                return i
+            if i is None:
+                sleep(0.2)
+                continue
+            sleep(0.1)
 
     @cache
     def __get_json(self, url: str):
@@ -52,13 +94,17 @@ class WikiApi:
             count[i] = count.get(i, 1) + 1
             if count[i] > 2:
                 return i
-            if i is not None and i.filmaffinity and count[i] > 1:
+            if i is None:
+                sleep(0.2)
+                continue
+            if i.filmaffinity:
                 return i
+            sleep(0.5)
 
     def __info_from_imdb(self, imdb_id: str):
         if imdb_id is None:
             return None
-        query = dedent("""
+        query = """
             SELECT ?item ?itemLabel ?country ?countryLabel ?filmaffinity ?article WHERE {
               ?item wdt:P345 "%s".     # IMDb ID
               OPTIONAL {
@@ -75,9 +121,8 @@ class WikiApi:
               }
               SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
             }
-        """).strip() % imdb_id
-        js = self.query_sparql(query)
-        bindings = dict_walk(js, 'results/bindings', instanceof=(list, type(None)))
+        """ % imdb_id
+        bindings = self.query_bindings(query)
         if not bindings:
             return None
 
@@ -100,11 +145,45 @@ class WikiApi:
             if isinstance(v, str) and v.isdigit():
                 v = int(v)
             vals[f] = v
-
+        url = vals['article/value']
+        if url is None:
+            url = self.query_str(
+                '0/article/value',
+                """
+                SELECT ?article WHERE {
+                    ?item wdt:P345 "%s".
+                    ?article schema:about ?item ; schema:isPartOf ?wikiSite .
+                    FILTER(STRSTARTS(STR(?wikiSite), "https://"))
+                }
+                LIMIT 1
+                """ % imdb_id
+            )
         return WikiInfo(
-            url=vals['article/value'],
+            url=url,
             country=self.__parse_countries(vals['countryLabel/value']),
             filmaffinity=vals['filmaffinity/value']
+        )
+
+    def parse_url(self, url: str):
+        if url is None:
+            return None
+        lang = url.split("://", 1)[-1].split(".", 1)[0]
+        label = self.query_str(
+            '0/langItemLabel/value',
+            """
+            SELECT ?langItem ?langItemLabel WHERE {
+            {
+                ?langItem wdt:P424 "%s".
+            }
+            SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en". }
+            }
+            LIMIT 1
+            """ % lang
+        )
+        return WikiUrl(
+            url=url,
+            lang_code=lang,
+            lang_label=label
         )
 
     def __parse_countries(self, countries: set[str]):

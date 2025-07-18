@@ -157,7 +157,7 @@ class Rtve(Web):
                     rate=to_int_float(imdbRate),
                     votes=imdbVotes
                 ) if idImdb else None,
-                wiki=wiki.url or dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
+                wiki=WIKI.parse_url(wiki.url or dict_walk(ficha, 'idWiki', instanceof=(str, type(None)))),	
                 country=tuple(set(map(to_country, country))),
                 filmaffinity=wiki.filmaffinity
             )
