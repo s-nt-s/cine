@@ -46,12 +46,14 @@ class WikiApi:
 
     @cache
     def info_from_imdb(self, imdb_id: str):
-        seen = set()
+        count = dict()
         while True:
             i = self.__info_from_imdb(imdb_id)
-            if i in seen:
+            count[i] = count.get(i, 1) + 1
+            if count[i] > 2:
                 return i
-            seen.add(i)
+            if i is not None and count[i] > 1:
+                return i
 
     def __info_from_imdb(self, imdb_id: str):
         if imdb_id is None:
