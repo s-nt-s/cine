@@ -8,11 +8,36 @@ from functools import cache
 from os import environ
 import re
 from time import sleep
+from functools import wraps
+
 
 logger = logging.getLogger(__name__)
 
 PAGE_URL = environ['PAGE_URL']
 OWNER_MAIL = environ['OWNER_MAIL']
+
+
+def retry_until_stable(func):
+    def __sort_kv(kv: tuple[Any, int]):
+        k, v = kv
+        arr = []
+        arr.append(int(k is None))
+        arr.append(-v)
+        return tuple(arr)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        count = dict()
+        while True:
+            value = func(*args, **kwargs)
+            count[value] = count.get(value, 1) + 1
+            if count[value] > (2 + int(value is None)):
+                return sorted(count.items(), key=__sort_kv)[0][0]
+            if value is None:
+                sleep(0.5 * count[value])
+                continue
+            sleep(0.1 * count[value])
+    return wrapper
 
 
 class WikiUrl(NamedTuple):
@@ -54,9 +79,10 @@ class WikiApi:
 
     def query_sparql(self, query: str):
         # https://query.wikidata.org/
+        query = dedent(query).strip()
         r = self.__s.get(
             "https://query.wikidata.org/sparql",
-            params={"query": dedent(query).strip()}
+            params={"query": query}
         )
         r.raise_for_status()
         return r.json()
@@ -67,18 +93,54 @@ class WikiApi:
         return bindings
 
     @cache
-    def query_str(self, path: str, query: str) -> list[dict[str, Any]]:
-        count = dict()
-        while True:
-            dt = self.query_bindings(query)
-            i = dict_walk(dt, path, instanceof=(str, type(None)))
-            count[i] = count.get(i, 1) + 1
-            if count[i] > 2:
-                return i
-            if i is None:
-                sleep(0.2)
-                continue
-            sleep(0.1)
+    @retry_until_stable
+    def get_one(self, query: str, instanceof=None):
+        if not isinstance(instanceof, (tuple, type(None))):
+            instanceof = (instanceof, type(None))
+        query = "SELECT ?field WHERE {\n%s\n}\nLIMIT 1" % dedent(query)
+        dt = self.query_bindings(query)
+        return dict_walk(dt, '0/field/value', instanceof=instanceof)
+
+    @cache
+    @retry_until_stable
+    def get_label(self, field: str, value: str, lang: str) -> str | None:
+        arr = []
+        arr.append("SELECT ?fieldLabel WHERE {")
+        arr.append("{")
+        arr.append(f'   ?field {field} "{value}".')
+        arr.append("}")
+        arr.append('SERVICE wikibase:label { bd:serviceParam wikibase:language "%s". }' % lang)
+        arr.append("}")
+        arr.append("LIMIT 1")
+        query = "\n".join(arr)
+        dt = self.query_bindings(query)
+        return dict_walk(dt, '0/fieldLabel/value', instanceof=str)
+
+    @cache
+    @retry_until_stable
+    def get_tuple(self, query: str, instanceof=None):
+        if not isinstance(instanceof, (tuple, type(None))):
+            instanceof = (instanceof, type(None))
+        query = "SELECT ?field WHERE {\n%s\n}" % dedent(query)
+        dt = self.query_bindings(query)
+        arr = []
+        for x in dt:
+            i = dict_walk(x, 'field/value', instanceof=instanceof)
+            if i is not None and i not in arr:
+                arr.append(i)
+        return tuple(arr)
+
+    def query_str(self, query: str) -> str | None:
+        return self.get_one(query, instanceof=str)
+
+    def query_int(self, query: str) -> int | None:
+        return self.get_one(query, instanceof=int)
+
+    def query_tuple_str(self, query: str) -> tuple[str, ...]:
+        return self.get_tuple(query, instanceof=str)
+
+    def query_tuple_int(self, query: str) -> tuple[int, ...]:
+        return self.get_tuple(query, instanceof=int)
 
     @cache
     def __get_json(self, url: str):
@@ -88,30 +150,38 @@ class WikiApi:
 
     @cache
     def info_from_imdb(self, imdb_id: str):
+        def __sort_kv(kv: tuple[WikiInfo, int]):
+            k, v = kv
+            arr = []
+            arr.append(int(k is None))
+            arr.append(int(k is not None and k.url is None))
+            arr.append(int(k is not None and k.filmaffinity is None))
+            arr.append(-len(k.country) if k else 0)
+            arr.append(-v)
+            return tuple(arr)
+
         count = dict()
         while True:
             i = self.__info_from_imdb(imdb_id)
             count[i] = count.get(i, 1) + 1
-            if count[i] > 2:
-                return i
+            if count[i] > (2+int(i is None or i.filmaffinity is None)):
+                return sorted(count.items(), key=__sort_kv)[0][0]
             if i is None:
-                sleep(0.2)
+                sleep(0.2*count[i])
                 continue
-            if i.filmaffinity:
-                return i
-            sleep(0.5)
+            sleep(0.5*count[i])
 
     def __info_from_imdb(self, imdb_id: str):
         if imdb_id is None:
             return None
         query = """
             SELECT ?item ?itemLabel ?country ?countryLabel ?filmaffinity ?article WHERE {
-              ?item wdt:P345 "%s".     # IMDb ID
+              ?item wdt:P345 "%s".
               OPTIONAL {
-                ?item wdt:P495 ?country.       # País/es de origen o producción
+                ?item wdt:P495 ?country.
               }
               OPTIONAL {
-                ?item wdt:P480 ?filmaffinity. # URL FilmAffinity
+                ?item wdt:P480 ?filmaffinity.
               }
               OPTIONAL {
                 ?article schema:about ?item ; schema:isPartOf <https://es.wikipedia.org/> .
@@ -135,7 +205,7 @@ class WikiApi:
                 if v not in (None, ""):
                     vals[f].add(v)
         for f in ('filmaffinity/value', 'article/value'):
-            v = vals[f]
+            v: set[str | int] = vals[f]
             if len(v) != 1:
                 if len(v) > 1:
                     logger.warning(f"{f} ambiguo para {imdb_id}: {v}")
@@ -145,21 +215,24 @@ class WikiApi:
             if isinstance(v, str) and v.isdigit():
                 v = int(v)
             vals[f] = v
-        url = vals['article/value']
-        if url is None:
-            url = self.query_str(
-                '0/article/value',
+        if vals['article/value'] is None:
+            vals['article/value'] = self.query_str(
                 """
-                SELECT ?article WHERE {
-                    ?item wdt:P345 "%s".
-                    ?article schema:about ?item ; schema:isPartOf ?wikiSite .
-                    FILTER(STRSTARTS(STR(?wikiSite), "https://"))
-                }
-                LIMIT 1
+                ?item wdt:P345 "%s".
+                ?field schema:about ?item ; schema:isPartOf ?wikiSite .
+                FILTER(STRSTARTS(STR(?wikiSite), "https://"))
                 """ % imdb_id
             )
+        if vals['filmaffinity/value'] is None:
+            vals['filmaffinity/value'] = self.query_int(
+                """
+                ?item wdt:P345 "%s".
+                OPTIONAL { ?item wdt:P480 ?field . }
+                """ % imdb_id
+            )
+
         return WikiInfo(
-            url=url,
+            url=vals['article/value'],
             country=self.__parse_countries(vals['countryLabel/value']),
             filmaffinity=vals['filmaffinity/value']
         )
@@ -168,18 +241,7 @@ class WikiApi:
         if url is None:
             return None
         lang = url.split("://", 1)[-1].split(".", 1)[0]
-        label = self.query_str(
-            '0/langItemLabel/value',
-            """
-            SELECT ?langItem ?langItemLabel WHERE {
-            {
-                ?langItem wdt:P424 "%s".
-            }
-            SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en". }
-            }
-            LIMIT 1
-            """ % lang
-        )
+        label = self.get_label("wdt:P424", lang, "es,en")
         return WikiUrl(
             url=url,
             lang_code=lang,
@@ -192,7 +254,7 @@ class WikiApi:
             if c and re.match(r'^Q\d+$', c):
                 js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
                 c = js['entities'][c]['labels']['en']['value']
-            if c in (None, ""):
+            if c in ([None, ""]+arr):
                 continue
             arr.append(c)
         return tuple(arr)
