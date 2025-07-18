@@ -85,7 +85,6 @@ class OmdbApi:
         js = dict()
         url = f"{self.__html}{id}"
         soup = buildSoup(url, self.__get_html(url))
-        print(soup)
         votes = get_text(soup.select_one('a[aria-label="Ver puntuaciones de usuarios"]'))
         if votes is not None:
             imdbRating, imdbVotes = votes.replace("/10", " ").replace(" mil", "000").split()

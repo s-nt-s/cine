@@ -248,17 +248,25 @@ class Rtve(Web):
             return ("Documental", )
         if re_or(mainTopic, r"[Pp]el[íi]culas [Dd]ocumentales"):
             return ("Documental", )
+        if re_or(mainTopic, r"[Cc]omedia negra"):
+            return ("Comedia", )
         #if re_or(ecort_content, r"[Nn]o [Ff]icci[oó]n[\-\-\s]*[Ii]nformaci[óo]n"):
         #    return ("Documental", )
         if re_or(programType, r"[dD]ocumental"):
             return ("Documental", )
         if re_or(mainTopic, r"Thriller"):
             return ("Suspense", )
+        if re_or(ecort_content, r"Thriller"):
+            return ("Suspense", )
         meta_gnr = tuple(dict_walk(metadata, 'Genre', instanceof=(list, type(None))) or [])
-        if "Horror" in meta_gnr:
-            return ("Terror", )
         if "Biography" in meta_gnr:
             return ("Biográfico", )
+        if "Thriller" in meta_gnr:
+            return ("Suspense", )
+        if len(set(("Crime", "Mystery")).difference(meta_gnr)) == 0:
+            return ("Suspense", )
+        if "Horror" in meta_gnr:
+            return ("Terror", )
         genres: set[str] = set()
         for g in (ficha.get("generos") or []):
             v = trim(g.get('subGeneroInf')) or trim(g.get('generoInf'))
@@ -269,6 +277,8 @@ class Rtve(Web):
                 "Biografías": "Biográfico",
                 "Música": "Musical",
                 "Policíaca y suspense": "Suspense",
+                "Acción y aventuras": "Aventuras",
+                "Historia": "Histórico"
             }.get(v, v)
             genres.add(v)
         if len(genres):

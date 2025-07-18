@@ -46,6 +46,14 @@ class WikiApi:
 
     @cache
     def info_from_imdb(self, imdb_id: str):
+        seen = set()
+        while True:
+            i = self.__info_from_imdb(imdb_id)
+            if i in seen:
+                return i
+            seen.add(i)
+
+    def __info_from_imdb(self, imdb_id: str):
         if imdb_id is None:
             return None
         query = dedent("""
@@ -120,4 +128,5 @@ if __name__ == "__main__":
     imdb_id = sys.argv[1]
     api = WikiApi()
     result = api.info_from_imdb(imdb_id)
-    print(result._asdict())
+    if result:
+        print(result._asdict())

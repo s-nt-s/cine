@@ -139,11 +139,14 @@ span.infantil {
 span.terror {
   background-color: red;
 }
-span.accion-y-aventuras {
+span.aventuras {
   background-color: blueviolet;
 }
-span.historia {
+span.historico {
   background-color: cadetblue;
+}
+span.musical {
+  background-color: yellowgreen;
 }
 abbr.duration {
   white-space: nowrap;
