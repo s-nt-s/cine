@@ -6,6 +6,7 @@ import logging
 from typing import NamedTuple, Any
 from functools import cache
 from os import environ
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,12 @@ class WikiApi:
         endpoint = "https://query.wikidata.org/sparql"
 
         r = self.__s.get(endpoint, params={"query": query})
+        r.raise_for_status()
+        return r.json()
+
+    @cache
+    def __get_json(self, url: str):
+        r = self.__s.get(url)
         r.raise_for_status()
         return r.json()
 
@@ -85,9 +92,20 @@ class WikiApi:
 
         return WikiInfo(
             url=vals['article/value'],
-            country=tuple(vals['countryLabel/value']),
+            country=self.__parse_countries(vals['countryLabel/value']),
             filmaffinity=vals['filmaffinity/value']
         )
+
+    def __parse_countries(self, countries: set[str]):
+        arr = []
+        for c in countries:
+            if c in (None, ""):
+                continue
+            if re.match(r'^Q\d+$', c):
+                js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
+                c = js['entities'][c]['labels']['es']['value']
+            arr.append(c)
+        return tuple(arr)
 
 
 WIKI = WikiApi()

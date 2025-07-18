@@ -7,8 +7,7 @@ import logging
 from datetime import datetime
 from typing import Callable, Any
 from core.film import Film
-from bs4 import BeautifulSoup
-from core.web import get_text
+from core.filemanager import FM
 
 
 config_log("log/build_site.log")
@@ -36,7 +35,7 @@ order['estreno'] = sort_ids(lambda f: f.year or 0, reverse=True)
 order['genero'] = sort_ids(lambda f: f.genres)
 order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
-order['imdb'] = sort_ids(lambda f: (-(f.imdbRate or -1), 0 if f.imdbId else 1))
+order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate or -1), 0 if f.imdb else 1))
 
 j = Jnj2(
     "template/",
@@ -54,5 +53,7 @@ j.save(
     NOW=NOW,
     count=len(films)
 )
+
+FM.dump("out/films.json", films)
 
 print("Fin")

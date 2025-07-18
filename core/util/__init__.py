@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any
+from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any, TypeVar, Iterable
 from bs4 import Tag, BeautifulSoup
 from minify_html import minify
 import unicodedata
@@ -12,7 +12,6 @@ from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 from collections import Counter
 
-from typing import TypeVar, Callable, Iterable
 import uuid
 
 UUID_NAMESPACE = uuid.UUID('00000000-0000-0000-0000-000000000000')

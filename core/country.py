@@ -49,6 +49,8 @@ def to_country(s: str):
             spa="Alemania Occidental"
         )
     c = search_country(name=s)
+    if c is None:
+        raise ValueError(f"País no encontrado: {s}")
     cod: str = c.alpha_2
     name = LOCALE.territories.get(cod)
     return Country(

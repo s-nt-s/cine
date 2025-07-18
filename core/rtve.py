@@ -9,11 +9,11 @@ from core.filemanager import FM
 import logging
 from core.cache import Cache
 from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float
-from core.film import Film
+from core.film import Film, IMDb
 from core.omdbapi import OMDB
 import re
-from core.country import to_country
 from core.wiki import WIKI, WikiInfo
+from core.country import to_country
 
 
 logger = logging.getLogger(__name__)
@@ -144,9 +144,11 @@ class Rtve(Web):
                 director=tuple(director),
                 casting=tuple(casting),
                 genres=tuple(genres),
-                imdbId=idImdb,
-                imdbRate=to_int_float(imdbRate),
-                imdbVotes=imdbVotes,
+                imdb=IMDb(
+                    id=idImdb,
+                    rate=to_int_float(imdbRate),
+                    votes=imdbVotes
+                ) if idImdb else None,
                 wiki=wiki.url or dict_walk(ficha, 'idWiki', instanceof=(str, type(None))),	
                 country=tuple(set(map(to_country, country))),
                 filmaffinity=wiki.filmaffinity
