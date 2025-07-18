@@ -31,9 +31,10 @@ class WikiApi:
 
     def query_sparql(self, query: str):
         # https://query.wikidata.org/
-        endpoint = "https://query.wikidata.org/sparql"
-
-        r = self.__s.get(endpoint, params={"query": query})
+        r = self.__s.get(
+            "https://query.wikidata.org/sparql",
+            params={"query": query}
+        )
         r.raise_for_status()
         return r.json()
 
