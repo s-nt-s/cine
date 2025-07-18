@@ -51,7 +51,7 @@ def safe_get_m3u8(*urls):
             if m3u8 is None:
                 logger.warning(f"[¿?] {url}")
                 continue
-            r[url] = m3u8
+            yield url, m3u8
             logger.info(f"[OK] {url}")
         except YoutubeDLError as e:
             tries[url] = tries.get(url, 0) + 1
@@ -59,7 +59,6 @@ def safe_get_m3u8(*urls):
                 urls.append(url)
                 continue
             logger.warning(f"[KO] {url} {e}")
-    return r
 
 
 if __name__ == "__main__":
@@ -67,7 +66,7 @@ if __name__ == "__main__":
     r = requests.get(environ['PAGE_URL'])
     urls = re.findall(re.escape('https://www.rtve.es/play/')+r'[^"]+?/\d+/', r.text)
     with Database() as db:
-        done = db.to_tuple("SELECT url FROM M3U8 WHERE updated > NOW() - INTERVAL '2 days'")
+        done = db.to_tuple("SELECT url FROM M3U8 WHERE updated > NOW() - INTERVAL '10 days'")
         urls = sorted(set(urls).difference(done))
-        for k, v in safe_get_m3u8(*urls).items():
+        for k, v in safe_get_m3u8(*urls):
             db.insert("M3U8", url=k, m3u8=v, tail='ON CONFLICT (url) DO UPDATE SET m3u8 = EXCLUDED.m3u8, updated=now()')
