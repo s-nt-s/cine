@@ -48,7 +48,7 @@
         <h1 style="display: none">{{f.title}}</h1>
         <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
           <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha filmaffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">F</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}</p>
-          <p><span class="duration">{{f.duration | frm_time | safe}}</span>{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
+          <p>{{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>

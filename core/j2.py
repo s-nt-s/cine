@@ -126,20 +126,25 @@ def yjoin(arr: tuple):
 def frm_time(m: int):
     if m is None:
         return ""
+    if m == 1:
+        return f'<abbr class="duration" title="{m} minuto">{m}m</abbr>'
     if m < 60:
-        return f"{m} <abbr title='minutos'>m</abbr>"
+        return f'<abbr class="duration" title="{m} minutos">{m}m</abbr>'
     h = m // 60
     m = m % 60
     arr = []
     if h == 1:
-        arr.append(f"{h} <abbr title='hora'>h</abbr>")
-    elif h > 1:
-        arr.append(f"{h} <abbr title='horas'>h</abbr>")
+        arr.append(f"{h} hora")
+    else:
+        arr.append(f"{h} horas")
+    if m == 0:
+        return f'<abbr class="duration" title="{arr[0]}">{h}h</abbr>'
     if m == 1:
-        arr.append(f"{m} <abbr title='minuto'>m</abbr>")
+        arr.append(f"{m} minuto")
     elif m > 1:
-        arr.append(f"{m} <abbr title='minutos'>m</abbr>")
-    return " y ".join(arr)
+        arr.append(f"{m} minutos")
+    title = " y ".join(arr)
+    return f'<abbr class="duration" title="{title}">{h}h y {m}m</abbr>'
 
 
 def get_default_target_links(soup: bs4.Tag):

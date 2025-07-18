@@ -99,11 +99,11 @@ class WikiApi:
     def __parse_countries(self, countries: set[str]):
         arr = []
         for c in countries:
+            if c and re.match(r'^Q\d+$', c):
+                js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
+                c = js['entities'][c]['labels']['en']['value']
             if c in (None, ""):
                 continue
-            if re.match(r'^Q\d+$', c):
-                js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
-                c = js['entities'][c]['labels']['es']['value']
             arr.append(c)
         return tuple(arr)
 
