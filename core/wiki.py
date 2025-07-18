@@ -52,7 +52,7 @@ class WikiApi:
             count[i] = count.get(i, 1) + 1
             if count[i] > 2:
                 return i
-            if i is not None and count[i] > 1:
+            if i is not None and i.filmaffinity and count[i] > 1:
                 return i
 
     def __info_from_imdb(self, imdb_id: str):

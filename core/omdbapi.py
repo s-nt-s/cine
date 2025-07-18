@@ -77,7 +77,7 @@ class OmdbApi:
             return True
         if not isinstance(js.get("imdbVotes"), (int, float)):
             return True
-        if set(('France', 'Germany')).intersection(js.get('Country', set())):
+        if set(('France', 'Germany', 'Australia')).intersection(js.get('Country', set())):
             return True
         return False
 
