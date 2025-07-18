@@ -123,6 +123,25 @@ def yjoin(arr: tuple):
     return ", ".join(arr[:-1])+" y "+arr[-1]
 
 
+def frm_time(m: int):
+    if m is None:
+        return ""
+    if m < 60:
+        return f"{m} <abbr title='minutos'>m</abbr>"
+    h = m // 60
+    m = m % 60
+    arr = []
+    if h == 1:
+        arr.append(f"{h} <abbr title='hora'>h</abbr>")
+    elif h > 1:
+        arr.append(f"{h} <abbr title='horas'>h</abbr>")
+    if m == 1:
+        arr.append(f"{m} <abbr title='minuto'>m</abbr>")
+    elif m > 1:
+        arr.append(f"{m} <abbr title='minutos'>m</abbr>")
+    return " y ".join(arr)
+
+
 def get_default_target_links(soup: bs4.Tag):
     def _isRemote(href: str):
         proto = href.split("://")[0].lower()
@@ -157,6 +176,7 @@ class Jnj2():
         self.j2_env.filters['simplify'] = simplify
         self.j2_env.filters['twoDec'] = twoDec
         self.j2_env.filters['yjoin'] = yjoin
+        self.j2_env.filters['frm_time'] = frm_time
         self.destino = destino
         self.pre = pre
         self.post = post
