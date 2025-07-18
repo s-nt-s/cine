@@ -20,6 +20,14 @@ logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
 
 
+def get_positive(data: dict, field: str):
+    val = dict_walk(data, field, instanceof=(int, float, type(None)))
+    if val is None or val < 0:
+        return None
+    i = int(val)
+    return i if i == val else val
+
+
 def _clean_js(k: str, obj: list | dict | str):
     if isinstance(obj, str):
         obj = obj.strip()
@@ -112,9 +120,9 @@ class Rtve(Web):
             casting: list[str] = dict_walk(ficha, 'casting', instanceof=(list, type(None))) or \
                                  dict_walk(metad, 'Actors', instanceof=(list, type(None))) or \
                                  list()
-            imdbRate: float = dict_walk(ficha, 'imdbRate', instanceof=(int, float, type(None))) or \
-                              dict_walk(metad, 'imdbRating', instanceof=(int, float, type(None)))
-            imdbVotes: int = dict_walk(metad, 'imdbVotes', instanceof=(int, type(None)))
+            imdbRate: float = get_positive(ficha, 'imdbRate') or \
+                              get_positive(metad, 'imdbRating')
+            imdbVotes: int = get_positive(metad, 'imdbVotes')
             duration = dict_walk(ficha, 'duration', instanceof=int)
             if isinstance(duration, int):
                 duration = int(duration/(60*1000))

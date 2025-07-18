@@ -27,7 +27,7 @@ def _clean_js(k: str, obj):
         if re.match(r"^\d+[\.\d,]*$", obj) and k in ("imdbVotes", ):
             return int(obj.replace(",", ""))
         return obj
-    if isinstance(obj, (int, float)) and obj < 0 and k in ("imdbRating", ):
+    if isinstance(obj, (int, float)) and obj < 0 and k in ("imdbRating", "imdbVotes"):
         return None
     return obj
 
@@ -85,6 +85,7 @@ class OmdbApi:
         js = dict()
         url = f"{self.__html}{id}"
         soup = buildSoup(url, self.__get_html(url))
+        print(soup)
         votes = get_text(soup.select_one('a[aria-label="Ver puntuaciones de usuarios"]'))
         if votes is not None:
             imdbRating, imdbVotes = votes.replace("/10", " ").replace(" mil", "000").split()
