@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 PAGE_URL = environ['PAGE_URL']
 OWNER_MAIL = environ['OWNER_MAIL']
 
-insert_imdb_filmaffinity = "insert into KEY_INT (name, id, val) values ('imdb_filmaffinity', %s, %s) ON CONFLICT (name, id) DO UPDATE SET val = EXCLUDED.val, updated=now()"
-
 
 def _is_empty(x: Any):
     if x is None:

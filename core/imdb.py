@@ -276,7 +276,7 @@ class IMDBApi:
         if re_or(title, r"^Bardem, la metamorfosis", flags=re.I) and year in (2023, 2020):
             return "tt31647570"
         if re_or(title, r"^Indomable, Ava Gardner", flags=re.I) and year in (2018, 2016):
-            return "tt31647570"
+            return "tt8610760"
         if re_or(title, r"^Los ángeles exterminados", flags=re.I) and year == 1968:
             return "tt37384074"
         if re_or(title, r"^El traje", flags=re.I) and year == 2002:
