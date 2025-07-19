@@ -24,6 +24,7 @@ class Database:
     @property
     def con(self) -> PGConnection:
         if self.__con is None or self.__con.closed:
+            logger.info("Creating connection to database")
             self.__con = psycopg2.connect(
                 host=environ["DB_HOST"],
                 port=int(environ["DB_PORT"]),
@@ -32,6 +33,7 @@ class Database:
                 password=environ["DB_PASSWORD"]
             )
             if not self.__atexit_registered:
+                logger.info("Register database connection")
                 register(self.close)
                 self.__atexit_registered = True
         return self.__con
@@ -45,6 +47,7 @@ class Database:
     def close(self) -> None:
         if self.__con:
             if not self.__con.closed:
+                logger.info("Closing connection to database")
                 self.__con.close()
             self.__con = None
 
