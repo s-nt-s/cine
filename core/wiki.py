@@ -9,12 +9,15 @@ from os import environ
 import re
 from time import sleep
 from functools import wraps
+from core.db import DBCache, DB
 
 
 logger = logging.getLogger(__name__)
 
 PAGE_URL = environ['PAGE_URL']
 OWNER_MAIL = environ['OWNER_MAIL']
+
+insert_imdb_filmaffinity = "insert into KEY_INT (name, id, val) values ('imdb_filmaffinity', %s, %s) ON CONFLICT (name, id) DO UPDATE SET val = EXCLUDED.val, updated=now()"
 
 
 def retry_until_stable(func):
@@ -171,6 +174,19 @@ class WikiApi:
                 continue
             sleep(0.5*count[i])
 
+    @cache
+    @DBCache(
+        select="select val from KEY_INT where name = 'imdb_filmaffinity' and id = %s",
+        insert=insert_imdb_filmaffinity
+    )
+    def __get_filmaffinity_from_imdb(self, imdb_id: str):
+        return self.query_int(
+            """
+            ?item wdt:P345 "%s".
+            OPTIONAL { ?item wdt:P480 ?field . }
+            """ % imdb_id
+        )
+
     def __info_from_imdb(self, imdb_id: str):
         if imdb_id is None:
             return None
@@ -224,12 +240,9 @@ class WikiApi:
                 """ % imdb_id
             )
         if vals['filmaffinity/value'] is None:
-            vals['filmaffinity/value'] = self.query_int(
-                """
-                ?item wdt:P345 "%s".
-                OPTIONAL { ?item wdt:P480 ?field . }
-                """ % imdb_id
-            )
+            vals['filmaffinity/value'] = self.__get_filmaffinity_from_imdb(imdb_id)
+        else:
+            DB.insert(insert_imdb_filmaffinity, imdb_id, vals['filmaffinity/value'])
 
         return WikiInfo(
             url=vals['article/value'],

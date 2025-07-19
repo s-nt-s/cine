@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import logging
 from functools import update_wrapper
 from psycopg2.extras import Json as DBJson
+from atexit import register
 
 logger = logging.getLogger()
 
@@ -18,10 +19,11 @@ class EmptyInsertException(psycopg2.OperationalError):
 class Database:
     def __init__(self) -> None:
         self.__con: Optional[PGConnection] = None
+        self.__atexit_registered = False
 
     @property
     def con(self) -> PGConnection:
-        if self.__con is None:
+        if self.__con is None or self.__con.closed:
             self.__con = psycopg2.connect(
                 host=environ["DB_HOST"],
                 port=int(environ["DB_PORT"]),
@@ -29,6 +31,9 @@ class Database:
                 user=environ["DB_USER"],
                 password=environ["DB_PASSWORD"]
             )
+            if not self.__atexit_registered:
+                register(self.close)
+                self.__atexit_registered = True
         return self.__con
 
     def __enter__(self) -> "Database":
@@ -39,7 +44,8 @@ class Database:
 
     def close(self) -> None:
         if self.__con:
-            self.__con.close()
+            if not self.__con.closed:
+                self.__con.close()
             self.__con = None
 
     @cache
@@ -142,6 +148,9 @@ class Database:
             raise
 
 
+DB = Database()
+
+
 class DBCache:
     def __init__(self, select: str, insert: str, kwself=None, loglevel=None):
         self.__select = select
@@ -150,14 +159,12 @@ class DBCache:
         self.__loglevel = loglevel
 
     def read(self, *args):
-        with Database() as db:
-            return db.one(self.__select, *args)
+        return DB.one(self.__select, *args)
 
     def save(self, data, *args):
-        with Database() as db:
-            if isinstance(data, (list, dict)):
-                data = DBJson(data)
-            return db.execute(self.__insert, args + (data, ))
+        if isinstance(data, (list, dict)):
+            data = DBJson(data)
+        return DB.execute(self.__insert, args + (data, ))
 
     def log(self, txt):
         if self.__loglevel is not None:

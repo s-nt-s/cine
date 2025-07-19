@@ -15,3 +15,12 @@ CREATE TABLE URL_TXT (
     txt TEXT NOT NULL,
     updated TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE KEY_INT (
+    name TEXT NOT NULL,
+    id TEXT NOT NULL,
+    val INTEGER NOT NULL,
+    updated TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (name, id)
+);
+
