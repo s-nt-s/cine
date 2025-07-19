@@ -19,6 +19,14 @@ OWNER_MAIL = environ['OWNER_MAIL']
 insert_imdb_filmaffinity = "insert into KEY_INT (name, id, val) values ('imdb_filmaffinity', %s, %s) ON CONFLICT (name, id) DO UPDATE SET val = EXCLUDED.val, updated=now()"
 
 
+def _is_empty(x: Any):
+    if x is None:
+        return True
+    if isinstance(x, (dict, list, tuple, set, str)):
+        return len(x) == 0
+    return False
+
+
 def retry_until_stable(func):
     def __sort_kv(kv: tuple[Any, int]):
         k, v = kv
@@ -34,7 +42,7 @@ def retry_until_stable(func):
         while True:
             value = func(*args, **kwargs)
             count[value] = count.get(value, 1) + 1
-            if count[value] > (2 + int(value is None or (isinstance(value, tuple) and len(value)==0))):
+            if count[value] > (2 + int(_is_empty(value))):
                 return sorted(count.items(), key=__sort_kv)[0][0]
             if value is None:
                 sleep(0.5 * count[value])
@@ -47,7 +55,7 @@ def log_if_empty(method):
     @wraps(method)
     def wrapper(self: "WikiApi", *args, **kwargs):
         val = method(self, *args, **kwargs)
-        if val is None or (isinstance(val, (list, tuple, dict, str)) and len(val) == 0):
+        if _is_empty(val):
             logger.debug("Empty query:\n"+self.last_query)
         return val
     return wrapper
