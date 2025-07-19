@@ -45,8 +45,29 @@ def dict_walk(obj: Union[Dict, List, None], path: str, instanceof: Union[None, T
         if (instanceof == int or (isinstance(instanceof, tuple) and int in instanceof)):
             v = int(v)
     if instanceof is not None and not isinstance(v, instanceof):
-        raise ValueError(f"{path} is {type(v)} instead of {instanceof}")
+        raise ValueError(f"{path} is {type(v)} instead of {instanceof}: {v}")
     return v
+
+
+def dict_walk_positive(data: dict, field: str):
+    val = dict_walk(data, field, instanceof=(int, float, type(None)))
+    if val is None or val < 0:
+        return None
+    i = int(val)
+    return i if i == val else val
+
+
+def dict_walk_tuple(data: dict, path: str):
+    arr = dict_walk(data, path, instanceof=(list, type(None)))
+    if not arr:
+        return tuple()
+    vals = []
+    for i in arr:
+        if isinstance(i, str):
+            i = i.strip()
+        if i not in ([None, ""]+vals):
+            vals.append(i)
+    return tuple(vals)
 
 
 def _dict_walk(d: Union[Dict, List, None], path: str, raise_if_not_found=False):

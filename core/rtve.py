@@ -8,24 +8,16 @@ from bs4 import Tag
 from core.filemanager import FM
 import logging
 from core.cache import Cache
-from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float
+from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float, dict_walk_positive
 from core.film import Film, IMDb
-from core.omdbapi import OMDB
+from core.imdb import IMDB, IMDBInfo
 import re
-from core.wiki import WIKI, WikiInfo
+from core.wiki import WIKI
 from core.country import to_country
 
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
-
-
-def get_positive(data: dict, field: str):
-    val = dict_walk(data, field, instanceof=(int, float, type(None)))
-    if val is None or val < 0:
-        return None
-    i = int(val)
-    return i if i == val else val
 
 
 def _clean_js(k: str, obj: list | dict | str):
@@ -97,45 +89,38 @@ class Rtve(Web):
                 title = title.replace('"', "'")
             title = re.sub(r"\s*\(\s*[Cc]ortometraje\s*\)\s*$", "", title)
 
-            is_ko = self.__is_ko(ficha, None, None)
+            is_ko = self.__is_ko(ficha, None)
             if is_ko:
                 logger.warning(f"{idAsset} {title} descartado por "+is_ko)
                 continue
 
             year: int = dict_walk(ficha, 'productionDate', instanceof=(int, type(None)))
-            idImdb = OMDB.get_id(title, year) or \
+            idImdb = IMDB.get_id(title, year) or \
                      dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
-            metad = OMDB.get(idImdb)
+            imdb_info = IMDB.get(idImdb)
 
-            is_ko = self.__is_ko(ficha, idImdb, metad)
+            is_ko = self.__is_ko(ficha, imdb_info)
             if is_ko:
                 logger.warning(f"{idAsset} {title} descartado por "+is_ko)
                 continue
 
-            genres = self.__get_genres(ficha, metad)
-            img = self.__get_img(li, ficha, metad)
+            genres = self.__get_genres(ficha, imdb_info)
+            img = self.__get_img(li, ficha, imdb_info)
             director: list[str] = dict_walk(ficha, 'director', instanceof=(list, type(None))) or \
-                                  dict_walk(metad, 'Director', instanceof=(list, type(None))) or \
+                                  list(imdb_info.director) or \
                                   list()
             casting: list[str] = dict_walk(ficha, 'casting', instanceof=(list, type(None))) or \
-                                 dict_walk(metad, 'Actors', instanceof=(list, type(None))) or \
+                                 list(imdb_info.actor) or \
                                  list()
-            imdbRate: float = get_positive(ficha, 'imdbRate') or \
-                              get_positive(metad, 'imdbRating')
-            imdbVotes: int = get_positive(metad, 'imdbVotes')
+            imdbRate: float = dict_walk_positive(ficha, 'imdbRate') or \
+                              imdb_info.rating
             duration = dict_walk(ficha, 'duration', instanceof=int)
             if isinstance(duration, int):
                 duration = int(duration/(60*1000))
             if year is None:
-                year: int = dict_walk(metad, 'Year', instanceof=(int, type(None)))
+                year: int = imdb_info.year
 
             url = dict_walk(ficha, 'htmlUrl', instanceof=str)
-            wiki = WIKI.info_from_imdb(idImdb) or WikiInfo(url=None, country=tuple(), filmaffinity=None)
-            country = dict_walk(metad, 'Country', instanceof=(list, type(None)))
-            if not country:
-                country = wiki.country
-            elif wiki.country:
-                country = tuple(set(country).intersection(wiki.country)) or wiki.country
             f = Film(
                 source="rtve",
                 id=idAsset,
@@ -155,16 +140,18 @@ class Rtve(Web):
                 imdb=IMDb(
                     id=idImdb,
                     rate=to_int_float(imdbRate),
-                    votes=imdbVotes
+                    votes=imdb_info.votes if imdb_info else None
                 ) if idImdb else None,
-                wiki=WIKI.parse_url(wiki.url or dict_walk(ficha, 'idWiki', instanceof=(str, type(None)))),	
-                country=tuple(set(map(to_country, country))),
-                filmaffinity=wiki.filmaffinity
+                wiki=WIKI.parse_url(imdb_info.wiki or dict_walk(ficha, 'idWiki', instanceof=(str, type(None)))),	
+                country=tuple(set(map(to_country, imdb_info.countries))),
+                filmaffinity=imdb_info.filmaffinity
             )
             films.add(f)
         return tuple(films)
 
-    def __is_ko(self, ficha: dict, imdb: str, metadata: dict):
+    def __is_ko(self, ficha: dict, info_imdb: IMDBInfo):
+        if info_imdb is None:
+            info_imdb = IMDBInfo(id=None)
         type_name: str = dict_walk(ficha, 'type/name', instanceof=str)
         sbty_name: str = dict_walk(ficha, 'subType/name', instanceof=(str, type(None)))
         if type_name in ('Avance', 'Fragmento'):
@@ -180,22 +167,14 @@ class Rtve(Web):
         programType = dict_walk(ficha, 'programInfo/programType', instanceof=(str, type(None)))
         if programType in ("Entrevistas", ):
             return f"programType={programType}"
-        if imdb is None:
-            return None
-        if not isinstance(metadata, dict):
-            soup = self.get_cached_soup(f"https://www.imdb.com/es-es/title/{imdb}")
-            if soup.find("a", string=re.compile(r"^\s*Todos\s*los\s*episodios\s*$", flags=re.I)):
-                return "imdb.web = Todos los episodios"
-            return None
-        m_type = metadata.get("Type")
-        if metadata.get('Awards') is None and 'Spain' not in metadata.get('Country', []) and "Documental" not in genres:
-            if m_type in ("tvmovie", "episode", "series"):
-                return "Type="+m_type
+        if info_imdb.awards is None and 'Spain' not in info_imdb.countries and "Documental" not in genres:
+            if info_imdb.typ in ("tvmovie", "episode", "series"):
+                return "Type="+info_imdb.typ
             if "TV Movies" in genres:
                 return "Genero=TV Movies"
-        for t in (metadata.get('Title'), ficha.get('title')):
+        for t in (info_imdb.title, ficha.get('title')):
             if re_or(t, "^Ein Sommer (an|auf)", r"^Corazón roto\. ", flags=re.I):
-                return "Title="+metadata.get('Title')
+                return "Title="+t
         #imdbRating = max(ficha.get('imdbRate') or 0, metadata.get('imdbRating') or 0)
         #if imdbRating < 4 and re_or(ficha.get('longTitle'), f"^Sesión de tarde \- "):
         #    return f"imdbRating={imdbRating} longTitle=Sesión de tarde..."
@@ -210,12 +189,12 @@ class Rtve(Web):
             return True
         return False
 
-    def __get_img(self, li: Tag, ficha: dict, metadata: dict) -> str:
+    def __get_img(self, li: Tag, ficha: dict, imdb_info: IMDBInfo) -> str:
         for img in li.select("img[data-src*=vertical]"):
             src = img.attrs["data-src"]
             if src:
                 return src
-        ficha['__poster'] = None if metadata is None else metadata.get("Poster")
+        ficha['__poster'] = imdb_info.img
         for k in (
             'previews/vertical',
             'previews/vertical2',
@@ -237,7 +216,9 @@ class Rtve(Web):
                 if isinstance(img, str):
                     return img
 
-    def __get_genres(self, ficha: dict, metadata: dict):
+    def __get_genres(self, ficha: dict, imdb_info: IMDBInfo):
+        if imdb_info is None:
+            imdb_info = IMDBInfo(id=None)
         mainTopic = dict_walk(ficha, 'mainTopic', instanceof=(str, type(None)))
         longTitle = dict_walk(ficha, 'longTitle', instanceof=(str, type(None)))
         ecort_content = dict_walk(ficha, 'escort/content', instanceof=(str, type(None)))
@@ -258,14 +239,13 @@ class Rtve(Web):
             return ("Suspense", )
         if re_or(ecort_content, r"Thriller"):
             return ("Suspense", )
-        meta_gnr = tuple(dict_walk(metadata, 'Genre', instanceof=(list, type(None))) or [])
-        if "Biography" in meta_gnr:
+        if "Biography" in imdb_info.genres:
             return ("Biográfico", )
-        if "Thriller" in meta_gnr:
+        if "Thriller" in imdb_info.genres:
             return ("Suspense", )
-        if len(set(("Crime", "Mystery")).difference(meta_gnr)) == 0:
+        if len(set(("Crime", "Mystery")).difference(imdb_info.genres)) == 0:
             return ("Suspense", )
-        if "Horror" in meta_gnr:
+        if "Horror" in imdb_info.genres:
             return ("Terror", )
         genres: set[str] = set()
         for g in (ficha.get("generos") or []):
@@ -285,7 +265,7 @@ class Rtve(Web):
             return tuple(genres)
         if re_or(ecort_content, "[dD]rama"):
             return ("Drama", )
-        return meta_gnr
+        return imdb_info.genres
 
     def __get_description(self, url: str, ficha: dict):
         arr = [i for i in map(

@@ -1,12 +1,15 @@
 from requests import Session
 from os import environ
 import logging
-from core.util import tp_split, re_or, mapdict
+from core.util import tp_split, re_or, mapdict, dict_walk, dict_walk_tuple, dict_walk_positive
 from core.cache import Cache
 from functools import cache
 import re
-from core.db import DBCache
+from core.db import DBCache, DB
 from core.web import buildSoup, get_text, WEB, find_by_text
+from core.wiki import WIKI
+from typing import NamedTuple, Optional
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +21,9 @@ def _clean_js(k: str, obj):
             return None
         if obj in ("True", "False"):
             return obj == "True"
+        nums = tuple(map(int, re.findall(r"\d+", obj)))
+        if k == 'Year' and len(nums) == 1 and nums[0] > 1900:
+            return nums[0]
         if obj.isdigit() and k in ('Year', "imdbRating", "totalSeasons"):
             return int(obj)
         if k in ("Director", "Writer", "Actors", "Genre", "Country"):
@@ -32,34 +38,144 @@ def _clean_js(k: str, obj):
     return obj
 
 
-class OmdbApi:
+def get_positive(data: dict, field: str):
+    val = dict_walk(data, field, instanceof=(int, float, type(None)))
+    if val is None or val < 0:
+        return None
+    i = int(val)
+    return i if i == val else val
+
+
+class DBIMDBWikiCache(DBCache):
+    def __init__(self, field):
+        super().__init__(
+            select=f"select {field} from IMDB_WIKI where id = %s",
+            insert=f"insert into IMDB_WIKI (id, {field}) values (%s, %s) ON CONFLICT (id) DO UPDATE SET {field} = EXCLUDED.{field}, updated=now()"
+        )
+
+    def read(self, *args):
+        val = super().read(*args)
+        if isinstance(val, list):
+            return tuple(val)
+        return val
+
+    def save(self, data, *args):
+        if isinstance(data, (list, tuple)) and len(data) == 0:
+            return
+        if isinstance(data, tuple):
+            data = list(data)
+        return DB.execute(self.insert, args + (data, ))
+
+
+class IMDBInfo(NamedTuple):
+    id: str
+    title: Optional[str] = None
+    director: Optional[tuple[str, ...]] = tuple()
+    actor: Optional[tuple[str, ...]] = tuple()
+    rating: Optional[float] = None
+    votes: Optional[int] = None
+    year: Optional[int] = None
+    countries: Optional[tuple[str, ...]] = tuple()
+    wiki: Optional[str] = None
+    awards: Optional[str] = None
+    typ: Optional[str] = None
+    genres: Optional[tuple[str, ...]] = tuple()
+    img: Optional[str] = None
+    filmaffinity: Optional[int] = None
+
+
+class IMDBApi:
     def __init__(self):
         key = environ['OMDBAPI_KEY']
-        self.__json = f"http://www.omdbapi.com/?apikey={key}&i="
-        self.__html = "https://www.imdb.com/es-es/title/"
+        self.__omdbapi = f"http://www.omdbapi.com/?apikey={key}&i="
+        self.__imdb = "https://www.imdb.com/es-es/title/"
         self.__s = Session()
 
     @DBCache(
         select="select json from OMBDAPI where id = %s and updated > NOW() - INTERVAL '30 days'",
         insert="insert into OMBDAPI (id, json) values (%s, %s) ON CONFLICT (id) DO UPDATE SET json = EXCLUDED.json, updated=now()"
     )
-    def __get_json(self, id: str):
-        r = self.__s.get(self.__json+id)
+    def __get_from_omdbapi(self, id: str):
+        r = self.__s.get(self.__omdbapi+id)
         js = r.json()
         return js
 
-    @cache
-    @Cache("rec/omdbapi/{}.json")
     def get(self, id: str):
+        if id is None:
+            return IMDBInfo(id=None)
+        data = self.__get(id)
+        if data is None:
+            return IMDBInfo(id=id)
+        return IMDBInfo(
+            id=id,
+            title=dict_walk(data, 'Title', instanceof=(str, type(None))),
+            director=dict_walk_tuple(data, 'Director'),
+            actor=dict_walk_tuple(data, 'Actors'),
+            rating=dict_walk_positive(data, 'imdbRating'),
+            votes=dict_walk_positive(data, 'imdbVotes'),
+            year=dict_walk_positive(data, 'Year'),
+            countries=tuple(self.__merge(
+                dict_walk(data, 'Country', instanceof=(list, type(None))),
+                dict_walk(data, 'wiki_countries', instanceof=(list, tuple, type(None)))
+            )),
+            wiki=dict_walk(data, 'wiki', instanceof=(str, type(None))),
+            awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
+            typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
+            genres=dict_walk_tuple(data, 'Genre'),
+            img=dict_walk(data, 'Poster', instanceof=(str, type(None))),
+            filmaffinity=dict_walk(data, 'filmaffinity', instanceof=(int, type(None))),
+        )
+
+    def __merge(self, countries1: list[str], countries2: list[str]):
+        if not countries1:
+            return countries2 or list()
+        if not countries2:
+            return countries1 or list()
+        merge = list(set(countries1).intersection(countries2))
+        if not merge:
+            return countries2 or list()
+        return merge
+
+    @cache
+    @Cache("rec/imdb/{}.json")
+    def __get(self, id: str):
+        data = self.__get_basic(id) or {}
+        for k in ('Response', ):
+            if k in data:
+                del data[k]
+        data['filmaffinity'] = self.__get_filmaffinity_from_imdb(id)
+        data['wiki'] = self.__get_wiki_from_imdb(id)
+        data['wiki_countries'] = self.__get_countries_from_imdb(id)
+        data = {k: v for k, v in data.items() if v is not None}
+        if len(data) == 0:
+            return None
+        return data
+
+    @cache
+    @DBIMDBWikiCache("filmaffinity")
+    def __get_filmaffinity_from_imdb(self, imdb_id: str):
+        return WIKI.get_filmaffinity_from_imdb(imdb_id)
+
+    @cache
+    @DBIMDBWikiCache("wiki")
+    def __get_wiki_from_imdb(self, imdb_id: str):
+        return WIKI.get_wiki_url_from_imdb(imdb_id)
+
+    @cache
+    @DBIMDBWikiCache("countries")
+    def __get_countries_from_imdb(self, imdb_id: str):
+        return WIKI.get_countries_from_imdb(imdb_id)
+
+    def __get_basic(self, id: str):
         if id in (None, ""):
             return None
-        js = self.__get_json(id)
+        js = self.__get_from_omdbapi(id)
         js = mapdict(_clean_js, js, compact=True)
         isError = js.get("Error")
         if isError:
-            logger.warning(f"OmdbApi: {id} = {js['Error']}")
+            logger.warning(f"IMDBApi: {id} = {js['Error']}")
         if self.__need_info(js):
-            soup_js = self.__get_from_html(id)
+            soup_js = self.__get_from_imdb(id)
             if isError:
                 return soup_js
             if soup_js is None:
@@ -79,15 +195,23 @@ class OmdbApi:
             return True
         if set(('France', 'Germany', 'Australia')).intersection(js.get('Country', set())):
             return True
+        if js.get('Type') not in ("episode", "series"):
+            return True
         return False
 
-    def __get_from_html(self, id: str):
+    def __get_from_imdb(self, id: str):
         js = dict()
-        url = f"{self.__html}{id}"
+        url = f"{self.__imdb}{id}"
         soup = buildSoup(url, self.__get_html(url))
         votes = get_text(soup.select_one('a[aria-label="Ver puntuaciones de usuarios"]'))
         if votes is not None:
-            imdbRating, imdbVotes = votes.replace("/10", " ").replace(" mil", "000").split()
+            votes = votes.replace("/10", " ")
+            votes = re.sub(r" mil$", "000", votes)
+            votes = re.sub(r" M$", "000000", votes)
+            spl = votes.split()
+            if len(spl) != 2:
+                raise ValueError(f"{url} = {spl}")
+            imdbRating, imdbVotes = spl
             js["imdbRating"] = float(imdbRating.replace(",", "."))
             js["imdbVotes"] = int(imdbVotes.replace(",", ""))
         if find_by_text(soup, "a", "Todos los episodios"):
@@ -161,9 +285,9 @@ class OmdbApi:
             return "tt33992356"
 
 
-OMDB = OmdbApi()
+IMDB = IMDBApi()
 
 if __name__ == "__main__":
     import sys
-    r = OMDB.get(sys.argv[1])
+    r = IMDB.get(sys.argv[1])
     print(r)

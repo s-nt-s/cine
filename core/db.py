@@ -158,6 +158,10 @@ class DBCache:
         self.__func = None
         self.__loglevel = loglevel
 
+    @property
+    def insert(self):
+        return self.__insert
+
     def read(self, *args):
         return DB.one(self.__select, *args)
 

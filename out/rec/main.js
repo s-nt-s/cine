@@ -216,8 +216,8 @@ function ifLocal() {
   if (!isLocal) return;
   const mkA = (url) => {
     const a = document.createElement("a");
-    const spl = url.split("/");
-    a.textContent = spl[spl.length-1];
+    const spl = url.split(/\/|\./);
+    a.textContent = spl[spl.length-2];
     a.href = url;
     return a;
   }
@@ -231,7 +231,7 @@ function ifLocal() {
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
     if (rtve) p.append(" ", mkA(`../rec/rtve/${gId(rtve.href)}.json`));
-    if (imdb) p.append(" ", mkA(`../rec/omdbapi/${gId(imdb.href)}.json`));
+    if (imdb) p.append(" ", mkA(`../rec/imdb/${gId(imdb.href)}.json`));
   })
 }
 

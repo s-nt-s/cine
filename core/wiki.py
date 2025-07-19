@@ -9,7 +9,7 @@ from os import environ
 import re
 from time import sleep
 from functools import wraps
-from core.db import DBCache, DB
+from core.db import DB
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ def retry_until_stable(func):
         k, v = kv
         arr = []
         arr.append(int(k is None))
+        arr.append(-len(k) if isinstance(k, tuple) else 0)
         arr.append(-v)
         return tuple(arr)
 
@@ -34,7 +35,7 @@ def retry_until_stable(func):
         while True:
             value = func(*args, **kwargs)
             count[value] = count.get(value, 1) + 1
-            if count[value] > (2 + int(value is None)):
+            if count[value] > (2 + int(value is None or (isinstance(value, tuple) and len(value)==0))):
                 return sorted(count.items(), key=__sort_kv)[0][0]
             if value is None:
                 sleep(0.5 * count[value])
@@ -63,12 +64,6 @@ class WikiUrl(NamedTuple):
             html += f' hreflang="{self.lang_code}"'
         html += '>W</a>'
         return html
-
-
-class WikiInfo(NamedTuple):
-    url: str
-    country: tuple[str, ...]
-    filmaffinity: str | None
 
 
 class WikiApi:
@@ -102,7 +97,8 @@ class WikiApi:
             instanceof = (instanceof, type(None))
         query = "SELECT ?field WHERE {\n%s\n}\nLIMIT 1" % dedent(query)
         dt = self.query_bindings(query)
-        return dict_walk(dt, '0/field/value', instanceof=instanceof)
+        if dt:
+            return dict_walk(dt, '0/field/value', instanceof=instanceof)
 
     @cache
     @retry_until_stable
@@ -117,7 +113,8 @@ class WikiApi:
         arr.append("LIMIT 1")
         query = "\n".join(arr)
         dt = self.query_bindings(query)
-        return dict_walk(dt, '0/fieldLabel/value', instanceof=str)
+        if dt:
+            return dict_walk(dt, '0/fieldLabel/value', instanceof=str)
 
     @cache
     @retry_until_stable
@@ -152,34 +149,7 @@ class WikiApi:
         return r.json()
 
     @cache
-    def info_from_imdb(self, imdb_id: str):
-        def __sort_kv(kv: tuple[WikiInfo, int]):
-            k, v = kv
-            arr = []
-            arr.append(int(k is None))
-            arr.append(int(k is not None and k.url is None))
-            arr.append(int(k is not None and k.filmaffinity is None))
-            arr.append(-len(k.country) if k else 0)
-            arr.append(-v)
-            return tuple(arr)
-
-        count = dict()
-        while True:
-            i = self.__info_from_imdb(imdb_id)
-            count[i] = count.get(i, 1) + 1
-            if count[i] > (2+int(i is None or i.filmaffinity is None)):
-                return sorted(count.items(), key=__sort_kv)[0][0]
-            if i is None:
-                sleep(0.2*count[i])
-                continue
-            sleep(0.5*count[i])
-
-    @cache
-    @DBCache(
-        select="select val from KEY_INT where name = 'imdb_filmaffinity' and id = %s",
-        insert=insert_imdb_filmaffinity
-    )
-    def __get_filmaffinity_from_imdb(self, imdb_id: str):
+    def get_filmaffinity_from_imdb(self, imdb_id: str):
         return self.query_int(
             """
             ?item wdt:P345 "%s".
@@ -187,68 +157,41 @@ class WikiApi:
             """ % imdb_id
         )
 
-    def __info_from_imdb(self, imdb_id: str):
-        if imdb_id is None:
-            return None
+    @cache
+    def get_wiki_url_from_imdb(self, imdb_id: str):
+        return self.query_str(
+            """
+            ?item wdt:P345 "%s".
+            ?field schema:about ?item ; schema:isPartOf ?wikiSite .
+            FILTER(STRSTARTS(STR(?wikiSite), "https://"))
+            """ % imdb_id
+        )
+
+    @cache
+    @retry_until_stable
+    def get_countries_from_imdb(self, imdb_id: str):
         query = """
-            SELECT ?item ?itemLabel ?country ?countryLabel ?filmaffinity ?article WHERE {
+            SELECT ?country ?countryLabel WHERE {
               ?item wdt:P345 "%s".
               OPTIONAL {
                 ?item wdt:P495 ?country.
               }
-              OPTIONAL {
-                ?item wdt:P480 ?filmaffinity.
-              }
-              OPTIONAL {
-                ?article schema:about ?item ; schema:isPartOf <https://es.wikipedia.org/> .
-              }
-              OPTIONAL {
-                ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> .
-              }
               SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
             }
         """ % imdb_id
+        countries: list[str] = []
         bindings = self.query_bindings(query)
-        if not bindings:
-            return None
-
-        vals: dict[str, Any] = defaultdict(set)
         for b in bindings:
-            for f in ('countryLabel/value', 'filmaffinity/value', 'article/value'):
-                v = dict_walk(b, f, instanceof=(str, type(None)))
-                if isinstance(v, str):
-                    v = v.strip()
-                if v not in (None, ""):
-                    vals[f].add(v)
-        for f in ('filmaffinity/value', 'article/value'):
-            v: set[str | int] = vals[f]
-            if len(v) != 1:
-                if len(v) > 1:
-                    logger.warning(f"{f} ambiguo para {imdb_id}: {v}")
-                vals[f] = None
+            c = dict_walk(b, 'countryLabel/value', instanceof=(str, type(None)))
+            if not isinstance(c, str):
                 continue
-            v = v.pop()
-            if isinstance(v, str) and v.isdigit():
-                v = int(v)
-            vals[f] = v
-        if vals['article/value'] is None:
-            vals['article/value'] = self.query_str(
-                """
-                ?item wdt:P345 "%s".
-                ?field schema:about ?item ; schema:isPartOf ?wikiSite .
-                FILTER(STRSTARTS(STR(?wikiSite), "https://"))
-                """ % imdb_id
-            )
-        if vals['filmaffinity/value'] is None:
-            vals['filmaffinity/value'] = self.__get_filmaffinity_from_imdb(imdb_id)
-        else:
-            DB.insert(insert_imdb_filmaffinity, imdb_id, vals['filmaffinity/value'])
-
-        return WikiInfo(
-            url=vals['article/value'],
-            country=self.__parse_countries(vals['countryLabel/value']),
-            filmaffinity=vals['filmaffinity/value']
-        )
+            c = c.strip()
+            if c and re.match(r'^Q\d+$', c):
+                js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
+                c = js['entities'][c]['labels']['en']['value']
+            if c and c not in countries:
+                countries.append(c)
+        return tuple(countries)
 
     def parse_url(self, url: str):
         if url is None:
@@ -260,17 +203,6 @@ class WikiApi:
             lang_code=lang,
             lang_label=label
         )
-
-    def __parse_countries(self, countries: set[str]):
-        arr = []
-        for c in countries:
-            if c and re.match(r'^Q\d+$', c):
-                js = self.__get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{c}.json")
-                c = js['entities'][c]['labels']['en']['value']
-            if c in ([None, ""]+arr):
-                continue
-            arr.append(c)
-        return tuple(arr)
 
 
 WIKI = WikiApi()

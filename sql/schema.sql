@@ -10,6 +10,14 @@ CREATE TABLE OMBDAPI (
     updated TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IMDB_WIKI (
+    id TEXT PRIMARY KEY,
+    filmaffinity INT,
+    wiki TEXT,
+    countries TEXT[],
+    updated TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE URL_TXT (
     url TEXT PRIMARY KEY,
     txt TEXT NOT NULL,
