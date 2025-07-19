@@ -175,9 +175,6 @@ class Rtve(Web):
         for t in (info_imdb.title, ficha.get('title')):
             if re_or(t, "^Ein Sommer (an|auf)", r"^Corazón roto\. ", flags=re.I):
                 return "Title="+t
-        #imdbRating = max(ficha.get('imdbRate') or 0, metadata.get('imdbRating') or 0)
-        #if imdbRating < 4 and re_or(ficha.get('longTitle'), f"^Sesión de tarde \- "):
-        #    return f"imdbRating={imdbRating} longTitle=Sesión de tarde..."
         return None
 
     def __is_ko_mainTopic(self, mainTopic: str):

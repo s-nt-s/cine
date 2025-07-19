@@ -40,7 +40,7 @@ def retry_until_stable(func):
         while True:
             value = func(*args, **kwargs)
             count[value] = count.get(value, 1) + 1
-            if count[value] > (2 + int(_is_empty(value))):
+            if count[value] > (1 + int(_is_empty(value))):
                 return sorted(count.items(), key=__sort_kv)[0][0]
             if value is None:
                 sleep(0.5 * count[value])
