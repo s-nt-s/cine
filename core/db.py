@@ -33,7 +33,7 @@ class Database:
                 password=environ["DB_PASSWORD"]
             )
             if not self.__atexit_registered:
-                logger.info("Register database connection")
+                logger.info("Register database connection in atexit")
                 register(self.close)
                 self.__atexit_registered = True
         return self.__con

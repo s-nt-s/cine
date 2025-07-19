@@ -8,6 +8,7 @@ from os import environ
 import re
 from time import sleep
 from functools import wraps
+from requests import JSONDecodeError
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,16 @@ def retry_until_stable(func):
     return wrapper
 
 
+def log_if_empty(method):
+    @wraps(method)
+    def wrapper(self: "WikiApi", *args, **kwargs):
+        val = method(self, *args, **kwargs)
+        if val is None or (isinstance(val, (list, tuple, dict, str)) and len(val) == 0):
+            logger.debug("Empty query:\n"+self.last_query)
+        return val
+    return wrapper
+
+
 class WikiUrl(NamedTuple):
     url: str
     lang_code: str
@@ -72,18 +83,31 @@ class WikiApi:
             "Accept": "application/sparql-results+json",
             'User-Agent': f'CineBoot/0.0 ({PAGE_URL}; {OWNER_MAIL})'
         })
+        self.__last_query: str | None = None
+
+    @property
+    def last_query(self):
+        return self.__last_query
 
     def query_sparql(self, query: str):
         # https://query.wikidata.org/
         query = dedent(query).strip()
         query = re.sub(r"\n(\s*\n)+", "\n", query)
-        logger.debug(query)
+        self.__last_query = query
         r = self.__s.get(
             "https://query.wikidata.org/sparql",
             params={"query": query}
         )
-        r.raise_for_status()
-        return r.json()
+        try:
+            r.raise_for_status()
+        except Exception:
+            logger.critical(f"Error ({r.status_code}) querying:\n"+query)
+            raise
+        try:
+            return r.json()
+        except JSONDecodeError:
+            logger.critical("Error (no JSON format) querying:\n"+query)
+            raise
 
     def query_bindings(self, query: str) -> list[dict[str, Any]]:
         data = self.query_sparql(query)
@@ -91,6 +115,7 @@ class WikiApi:
         return bindings
 
     @cache
+    @log_if_empty
     @retry_until_stable
     def get_one(self, query: str, instanceof=None, order_by: str = None):
         if not isinstance(instanceof, (tuple, type(None))):
@@ -103,6 +128,7 @@ class WikiApi:
             return dict_walk(dt, '0/field/value', instanceof=instanceof)
 
     @cache
+    @log_if_empty
     @retry_until_stable
     def get_label(self, field: str, value: str, lang: str) -> str | None:
         arr = []
@@ -119,6 +145,7 @@ class WikiApi:
             return dict_walk(dt, '0/fieldLabel/value', instanceof=str)
 
     @cache
+    @log_if_empty
     @retry_until_stable
     def get_tuple(self, query: str, instanceof=None):
         if not isinstance(instanceof, (tuple, type(None))):
