@@ -118,7 +118,7 @@ class IMDBApi:
                 dict_walk(data, 'Country', instanceof=(list, type(None))),
                 dict_walk(data, 'wiki_countries', instanceof=(list, tuple, type(None)))
             )),
-            wiki=dict_walk(data, 'wiki', instanceof=(str, type(None))),
+            wiki=self.__get_wiki_from_imdb(id), #dict_walk(data, 'wiki', instanceof=(str, type(None))),
             awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
             typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
             genres=dict_walk_tuple(data, 'Genre'),

@@ -1,7 +1,6 @@
 import requests
 from textwrap import dedent
 from core.util import dict_walk
-from collections import defaultdict
 import logging
 from typing import NamedTuple, Any
 from functools import cache
@@ -9,7 +8,6 @@ from os import environ
 import re
 from time import sleep
 from functools import wraps
-from core.db import DB
 
 
 logger = logging.getLogger(__name__)
@@ -78,6 +76,8 @@ class WikiApi:
     def query_sparql(self, query: str):
         # https://query.wikidata.org/
         query = dedent(query).strip()
+        query = re.sub(r"\n(\s*\n)+", "\n", query)
+        logger.debug(query)
         r = self.__s.get(
             "https://query.wikidata.org/sparql",
             params={"query": query}
@@ -92,11 +92,13 @@ class WikiApi:
 
     @cache
     @retry_until_stable
-    def get_one(self, query: str, instanceof=None):
+    def get_one(self, query: str, instanceof=None, order_by: str = None):
         if not isinstance(instanceof, (tuple, type(None))):
             instanceof = (instanceof, type(None))
-        query = "SELECT ?field WHERE {\n%s\n}\nLIMIT 1" % dedent(query)
-        dt = self.query_bindings(query)
+        full_query = "SELECT ?field WHERE {\n"+dedent(query)+"\n}"
+        if order_by:
+            full_query += f"\nORDER BY ?{order_by} STR(?field)"
+        dt = self.query_bindings(full_query+"\nLIMIT 1")
         if dt:
             return dict_walk(dt, '0/field/value', instanceof=instanceof)
 
@@ -130,11 +132,11 @@ class WikiApi:
                 arr.append(i)
         return tuple(arr)
 
-    def query_str(self, query: str) -> str | None:
-        return self.get_one(query, instanceof=str)
+    def query_str(self, query: str, order_by: str = None) -> str | None:
+        return self.get_one(query, instanceof=str, order_by=order_by)
 
-    def query_int(self, query: str) -> int | None:
-        return self.get_one(query, instanceof=int)
+    def query_int(self, query: str, order_by: str = None) -> int | None:
+        return self.get_one(query, instanceof=int, order_by=order_by)
 
     def query_tuple_str(self, query: str) -> tuple[str, ...]:
         return self.get_tuple(query, instanceof=str)
@@ -164,7 +166,25 @@ class WikiApi:
             ?item wdt:P345 "%s".
             ?field schema:about ?item ; schema:isPartOf ?wikiSite .
             FILTER(STRSTARTS(STR(?wikiSite), "https://"))
-            """ % imdb_id
+
+            BIND(REPLACE(STR(?wikiSite), "https://", "") AS ?domain)
+            BIND(STRBEFORE(?domain, ".wikipedia.org") AS ?lang)
+
+            OPTIONAL {
+                VALUES (?prioLang ?priority) {
+                ("es" 1)
+                ("en" 2)
+                ("ca" 3)
+                ("gl" 4)
+                ("it" 5)
+                ("fr" 6)
+                }
+                FILTER(?lang = ?prioLang)
+            }
+
+            BIND(COALESCE(?priority, 99) AS ?langPriority)
+            """ % imdb_id,
+            order_by="langPriority"
         )
 
     @cache
