@@ -293,6 +293,8 @@ class IMDBApi:
             return "tt0340407"
         if re_or(title, r"^Corazón roto. Fuga a Italia", flags=re.I) and year == 2023:
             return "tt33992356"
+        if re_or(title, r"^5\.?669 días", flags=re.I) and year == 2024:
+            return "tt35091016"
 
 
 IMDB = IMDBApi()
