@@ -9,7 +9,7 @@ from functools import update_wrapper
 from psycopg2.extras import Json as DBJson
 from atexit import register
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class EmptyInsertException(psycopg2.OperationalError):
