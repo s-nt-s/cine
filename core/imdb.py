@@ -91,6 +91,7 @@ class IMDBApi:
         self.__imdb = "https://www.imdb.com/es-es/title/"
         self.__s = Session()
 
+    @cache
     @DBCache(
         select="select json from OMBDAPI where id = %s and updated > NOW() - INTERVAL '30 days'",
         insert="insert into OMBDAPI (id, json) values (%s, %s) ON CONFLICT (id) DO UPDATE SET json = EXCLUDED.json, updated=now()"
@@ -100,10 +101,13 @@ class IMDBApi:
         js = r.json()
         return js
 
-    def get(self, id: str):
+    def get(self, id: str, completeWithImdb: bool = True, completeWithWiki: bool = True):
         if id is None:
             return IMDBInfo(id=None)
-        data = self.__get(id)
+        if not completeWithWiki:
+            data = self.__get_basic(id, completeWithImdb=completeWithImdb)
+        else:
+            data = self.__get(id)
         if data is None:
             return IMDBInfo(id=id)
         return IMDBInfo(
@@ -118,7 +122,7 @@ class IMDBApi:
                 dict_walk(data, 'Country', instanceof=(list, type(None))),
                 dict_walk(data, 'wiki_countries', instanceof=(list, tuple, type(None)))
             )),
-            wiki=self.__get_wiki_from_imdb(id), #dict_walk(data, 'wiki', instanceof=(str, type(None))),
+            wiki=dict_walk(data, 'wiki', instanceof=(str, type(None))),
             awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
             typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
             genres=dict_walk_tuple(data, 'Genre'),
@@ -139,10 +143,7 @@ class IMDBApi:
     @cache
     @Cache("rec/imdb/{}.json")
     def __get(self, id: str):
-        data = self.__get_basic(id) or {}
-        for k in ('Response', ):
-            if k in data:
-                del data[k]
+        data = self.__get_basic(id, completeWithImdb=True) or {}
         data['filmaffinity'] = self.__get_filmaffinity_from_imdb(id)
         data['wiki'] = self.__get_wiki_from_imdb(id)
         data['wiki_countries'] = self.__get_countries_from_imdb(id)
@@ -166,15 +167,20 @@ class IMDBApi:
     def __get_countries_from_imdb(self, imdb_id: str):
         return WIKI.get_countries_from_imdb(imdb_id)
 
-    def __get_basic(self, id: str):
+    def __get_basic(self, id: str, completeWithImdb=True):
         if id in (None, ""):
             return None
+        if not isinstance(id, str):
+            raise ValueError(id)
         js = self.__get_from_omdbapi(id)
         js = mapdict(_clean_js, js, compact=True)
         isError = js.get("Error")
+        response = js.get("Response")
         if isError:
             logger.warning(f"IMDBApi: {id} = {js['Error']}")
-        if self.__need_info(js):
+        elif response is not True:
+            logger.warning(f"IMDBApi: {id} Response = {response}")
+        if completeWithImdb and self.__need_info(js):
             soup_js = self.__get_from_imdb(id)
             if isError:
                 return soup_js
@@ -184,6 +190,9 @@ class IMDBApi:
                 val = js.get(k)
                 if k in ('Type', ) or (val is None or (isinstance(v, (int, float)) and isinstance(val, (int, float)) and val<v)):
                     js[k] = v
+        for k in ('Response', ):
+            if k in js:
+                del js[k]
         return js
 
     def __need_info(self, js: dict):
@@ -199,6 +208,7 @@ class IMDBApi:
             return True
         return False
 
+    @cache
     def __get_from_imdb(self, id: str):
         js = dict()
         url = f"{self.__imdb}{id}"

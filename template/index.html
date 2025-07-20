@@ -44,7 +44,7 @@
     </p>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="{{f.source}}{{f.id}}">
+      <div class="film" id="{{f.source}}{{f.id}}" data-expiration="{{f.expiration or ''}}">
         <h1 style="display: none">{{f.title}}</h1>
         <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
           <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}</p>

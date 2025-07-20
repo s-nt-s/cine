@@ -29,13 +29,13 @@ def sort_ids(fnc: Callable[[Film], Any], reverse=False):
 print("Generando web")
 order = dict()
 order['publicacion'] = sort_ids(lambda f: f.publication or '', reverse=True)
-order['expiracion'] = sort_ids(lambda f: f.expiration or '')
+order['expiracion'] = sort_ids(lambda f: (int(f.expiration is None), f.expiration or ''))
 order['duracion'] = sort_ids(lambda f: f.duration or 0)
 order['estreno'] = sort_ids(lambda f: f.year or 0, reverse=True)
 order['genero'] = sort_ids(lambda f: f.genres)
 order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
-order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate or -1), 0 if f.imdb else 1))
+order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate if f.imdb and f.imdb.rate else -1), 0 if f.imdb else 1))
 
 j = Jnj2(
     "template/",
