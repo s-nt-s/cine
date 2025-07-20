@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Callable, Any
 from core.film import Film
 from core.filemanager import FM
+import re
+from datetime import date
 
 
 config_log("log/build_site.log")
@@ -37,6 +39,26 @@ order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
 order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate if f.imdb and f.imdb.rate else -1), 0 if f.imdb else 1))
 
+
+def mk_date(s: str):
+    num = tuple(map(int, re.findall(r"\d+", s)))
+    d = date(num[0], num[1], num[2])
+    return d
+
+
+def get_expiration(fmls: tuple[Film]):
+    fmls = [f for f in fmls if f.expiration]
+    if len(fmls) == 0:
+        return None
+    exp: dict[str, Any] = dict()
+    min_exp = mk_date(min(f.expiration for f in fmls))
+    exp['__min__'] = min_exp
+    for f in fmls:
+        delta = (mk_date(f.expiration) - min_exp)
+        exp[f"{f.source}{f.id}"] = delta.days
+    return exp
+
+
 j = Jnj2(
     "template/",
     "out/",
@@ -45,6 +67,7 @@ j = Jnj2(
 j.create_script(
     "info.js",
     ORDER=order,
+    EXPIRATION=get_expiration(films),
     replace=True
 )
 j.save(

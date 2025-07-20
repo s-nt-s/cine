@@ -1,4 +1,12 @@
 const isLocal = ["", "localhost"].includes(document.location.hostname);
+const NOW = new Date();
+const TODAY = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate());
+const REMAIN_WEEK = TODAY.getDay()==0?0:(8-TODAY.getDay());
+const REMAIN_MONTH = (new Date(TODAY.getFullYear(), TODAY.getMonth()+1, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_MONTH_2 = (new Date(TODAY.getFullYear(), TODAY.getMonth()+2, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_YEAR = (new Date(TODAY.getFullYear()+1, 0, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_YEAR_2 = (new Date(TODAY.getFullYear()+2, 0, 1)-TODAY)/(1000*60*60*24);
+
 const $$ = (slc) => Array.from(document.querySelectorAll(slc));
 const DB = new Db();
 
@@ -251,6 +259,53 @@ function setOrder() {
   FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
 }
 
+function exp_to_msg(d) {
+  if (d<0) return ["⌛", "Ya caduco"]
+  if (d==0) return ["0d", "Caduca hoy"];
+  if (d==1) return ["1d", "Caduca mañana"];
+  if (d==2) return ["2d", "Caduca pasado mañana"];
+  if (d<=9) return [`${d}d`, `Caduca en ${d} días`];
+  if (d<=REMAIN_WEEK) return ["0s", "Caduca esta semana"];
+  if (d<=(REMAIN_WEEK+6)) return ["1s", "Caduca la semana que viene"];
+  if (d<=REMAIN_MONTH) {
+    const s = Math.floor(d/7);
+    if (s<=9) return [`${s}s`, `Caduca en ${s} semanas`];
+    return ["0m", "Caduca este mes"];
+  }
+  if (d<=REMAIN_MONTH_2) return ["1m", "Caduca el mes que viene"];
+  const m = Math.floor(d/30);
+  if (m<=9) return [`${m}m`,  `Caduca en ${m} meses`];
+  if (d<=REMAIN_YEAR) return ["0a", "Caduca este año"];
+  if (d<=REMAIN_YEAR_2) return ["1a", "Caduca el año que viene"];
+  const y = Math.floor(d/365);
+  if (y<=9) [`${y}a`, `Caduca en ${y} año${y!=1?'s':''}`];
+  return null;
+}
+
+function addExpirationInfo() {
+  if (EXPIRATION==null) return null;
+  const min_date = EXPIRATION.get('__min__');
+  if (min_date==null) return;
+  const diffMs = min_date - TODAY;
+  const min_days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  EXPIRATION.entries().forEach(([k, v])=>{
+    const n = document.querySelector("#"+k+" .expiration");
+    if (n==null) return;
+    const days = min_days + v;
+    const msg = exp_to_msg(days);
+    const de = n.getAttribute("data-expiration");
+    const tail = " ("+de.substring(0, 10)+")";
+    if (msg) {
+      n.textContent = msg[0].toLocaleLowerCase();
+      n.title = msg[1]+tail;
+    } else {
+      n.textContent = "∞";
+      n.title = "Disponible hasta dentro de mucho"+tail;
+      n.classList.remove("exp");
+      n.classList.add("no_exp");
+    }
+  })
+}
 
 document.addEventListener(
   "DOMContentLoaded",
@@ -259,6 +314,7 @@ document.addEventListener(
       $$("input[id$=_max],input[id$=_min]").filter(n => !n.disabled).map((n) =>
         n.id.replace(/_(max|min)$/, "")
       ))));
+    addExpirationInfo();
     setOrder();
     ifLocal();
     FormQuery.query_to_form();

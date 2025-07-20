@@ -44,7 +44,7 @@ def _g_date(ficha: dict, k: str):
     if s is None:
         return None
     num = tuple(map(int, re.findall(r"\d+", s)))
-    d = "{2:04d}-{1:02d}-{0:02d} {3:02d}:{4:02d}:{5:02d}".format(*num)
+    d = "{2:04d}-{1:02d}-{0:02d} {3:02d}:{4:02d}".format(*num)
     return d
 
 

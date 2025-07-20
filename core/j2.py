@@ -9,6 +9,7 @@ from os.path import relpath, dirname, exists, isfile
 from os import environ, makedirs
 from base64 import b64encode
 from bs4 import Tag
+from zoneinfo import ZoneInfo
 
 import bs4
 from jinja2 import Environment, FileSystemLoader
@@ -17,6 +18,7 @@ re_br = re.compile(r"<br/>(\s*</)")
 re_sp = re.compile(r"\s+")
 PAGE_URL = environ['PAGE_URL']
 REPO_URL = environ['REPO_URL']
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 
 def get_text(n: Tag):
@@ -25,8 +27,11 @@ def get_text(n: Tag):
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, (datetime, date)):
-            return o.__str__()
+        if isinstance(o, date) and not isinstance(o, datetime):
+            o = datetime.combine(o, datetime.min.time(), tzinfo=MADRID_TZ)
+            o = o.replace(tzinfo=MADRID_TZ)
+        if isinstance(o, datetime):
+            return ["<<Date>>", o.isoformat(), "<</END>>"]
         if isinstance(o, dict_items):
             return ["<<Map>>", list(o), "<</END>>"]
         if isinstance(o, dict):
@@ -344,7 +349,7 @@ class Jnj2():
                     separators=separators,
                     cls=CustomEncoder
                 )
-                js = re.sub(r'\[\s*"<<(Map|Set)>>"\s*,\s*', r'new \1(', js)
+                js = re.sub(r'\[\s*"<<(Map|Set|Date)>>"\s*,\s*', r'new \1(', js)
                 js = re.sub(r'\s*,\s*"<</END>>"\s*\]', ')', js)
                 if not self.minify:
                     js = re.sub(r'\s*\[[^\[\]]+\]\s*',

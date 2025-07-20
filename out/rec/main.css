@@ -253,3 +253,27 @@ body.cuadricula main div.film > a.poster img {
 body.cuadricula main div.film.expand > a.poster img {
   width: min(70px, calc(50vw - 1.5em - 10px)) !important;
 }
+abbr.expiration {
+  text-decoration: none;
+  aspect-ratio: 1 / 1;
+  min-width: 2.3ch;
+  text-transform: lowercase;
+  padding: 0.2em;
+  font-size: 0.9em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: bold;
+  background-color: #F4E1C1; 
+  color: #5C4033;
+}
+
+p.botonera {
+  line-height: 1.8;
+}
+p.botonera > * {
+  line-height: normal;
+  vertical-align: middle;
+}
