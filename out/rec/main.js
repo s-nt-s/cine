@@ -265,20 +265,18 @@ function exp_to_msg(d) {
   if (d==1) return ["1d", "Caduca mañana"];
   if (d==2) return ["2d", "Caduca pasado mañana"];
   if (d<=9) return [`${d}d`, `Caduca en ${d} días`];
-  if (d<=REMAIN_WEEK) return ["0s", "Caduca esta semana"];
-  if (d<=(REMAIN_WEEK+6)) return ["1s", "Caduca la semana que viene"];
-  if (d<=REMAIN_MONTH) {
-    const s = Math.floor(d/7);
-    if (s<=9) return [`${s}s`, `Caduca en ${s} semanas`];
-    return ["0m", "Caduca este mes"];
-  }
-  if (d<=REMAIN_MONTH_2) return ["1m", "Caduca el mes que viene"];
+  if (d<=REMAIN_WEEK) return ["1s", "Caduca esta semana"];
+  if (d<=(REMAIN_WEEK+6)) return ["2s", "Caduca la semana que viene"];
+  const s = Math.floor(d/7);
+  if (s<=9) return [`${s}s`, `Caduca en ${s} semanas`];
+  if (d<=REMAIN_MONTH) return ["1m", "Caduca este mes"];
+  if (d<=REMAIN_MONTH_2) return ["2m", "Caduca el mes que viene"];
   const m = Math.floor(d/30);
   if (m<=9) return [`${m}m`,  `Caduca en ${m} meses`];
-  if (d<=REMAIN_YEAR) return ["0a", "Caduca este año"];
-  if (d<=REMAIN_YEAR_2) return ["1a", "Caduca el año que viene"];
-  const y = Math.floor(d/365);
-  if (y<=9) [`${y}a`, `Caduca en ${y} año${y!=1?'s':''}`];
+  if (d<=REMAIN_YEAR) return ["1a", "Caduca este año"];
+  const y = Math.max(1, Math.floor(d/365));
+  if (d<=REMAIN_YEAR_2) return [`${y}a`, "Caduca el año que viene"];
+  if (y<=9) return [`${y}a`, `Caduca en ${y} año${y!=1?'s':''}`];
   return null;
 }
 
@@ -300,7 +298,8 @@ function addExpirationInfo() {
       n.title = msg[1]+tail;
     } else {
       n.textContent = "∞";
-      n.title = "Disponible hasta dentro de mucho"+tail;
+      const y = Math.floor(days/365);
+      n.title = `Caduca en ${Math.floor(days/365)} años`+tail;
       n.classList.remove("exp");
       n.classList.add("no_exp");
     }
