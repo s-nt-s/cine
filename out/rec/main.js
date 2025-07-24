@@ -277,7 +277,7 @@ function exp_to_msg(d) {
   const y = Math.max(1, Math.floor(d/365));
   if (d<=REMAIN_YEAR_2) return [`${y}a`, "Caduca el año que viene"];
   if (y<=9) return [`${y}a`, `Caduca en ${y} año${y!=1?'s':''}`];
-  return null;
+  return ["∞",  `Caduca en ${y} años`];
 }
 
 function addExpirationInfo() {
@@ -292,14 +292,9 @@ function addExpirationInfo() {
     const days = min_days + v;
     const msg = exp_to_msg(days);
     const de = n.getAttribute("data-expiration");
-    const tail = " ("+de.substring(0, 10)+")";
-    if (msg) {
-      n.textContent = msg[0].toLocaleLowerCase();
-      n.title = msg[1]+tail;
-    } else {
-      n.textContent = "∞";
-      const y = Math.floor(days/365);
-      n.title = `Caduca en ${Math.floor(days/365)} años`+tail;
+    n.textContent = msg[0].toLocaleLowerCase();
+    n.title = msg[1]+" ("+de.substring(0, 10)+")";
+    if (msg[0]=="∞") {
       n.classList.remove("exp");
       n.classList.add("no_exp");
     }
