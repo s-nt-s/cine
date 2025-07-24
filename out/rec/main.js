@@ -327,7 +327,10 @@ document.addEventListener(
         div.classList.toggle("expand");
         requestAnimationFrame(() => {
           const delta = div.getBoundingClientRect().top - top;
-          window.scrollBy(0, delta);
+          if (delta!=0) {
+            console.log(`window.scrollBy(0, ${delta})`);
+            window.scrollBy(0, delta);
+          }
         });
       });
     });
