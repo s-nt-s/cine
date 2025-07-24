@@ -231,9 +231,7 @@ body.cuadricula main div.film:not(.expand) > * {
   display: none;
 }
 body.cuadricula main div.film.expand {
-  height: 200px;
-  max-width: 610px;
-  overflow-y: auto;
+  width: 100%;
   vertical-align: top;
 }
 body.cuadricula main div.film > a.poster {
