@@ -327,7 +327,13 @@ document.addEventListener(
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-        a.closest("div.film").classList.toggle("expand");
+        const div = a.closest("div.film");
+        const top = div.getBoundingClientRect().top;
+        div.classList.toggle("expand");
+        requestAnimationFrame(() => {
+          const delta = div.getBoundingClientRect().top - top;
+          window.scrollBy(0, delta);
+        });
       });
     });
     const urls = $$("a.title").map(i=>i.href);
