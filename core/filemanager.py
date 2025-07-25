@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 from json.decoder import JSONDecodeError
 from dataclasses import is_dataclass, asdict
+from genson import SchemaBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,55 @@ def myex(e, msg):
         largs.append(msg)
     e.args = tuple(largs)
     return e
+
+
+def _complete_schema(schema: dict, obj: list, threshold=20):
+    if not isinstance(obj, list):
+        return schema
+    obj = [o for o in obj if o is not None]
+    if len(obj) == 0:
+        return schema
+    schema_type = schema['type']
+    typ = None
+    hasNull = None
+    if isinstance(schema_type, str):
+        typ = schema_type
+        hasNull = False
+    elif isinstance(schema_type, list):
+        st = tuple(sorted((s for s in schema_type if s not in ("null", None))))
+        hasNull = len(st) < len(schema_type)
+        if len(st) == 1:
+            typ = st[0]
+    if typ == 'object':
+        for k, v in list(schema['properties'].items()):
+            schema['properties'][k] = _complete_schema(v, [o.get(k) for o in obj], threshold=threshold)
+        return schema
+    if typ == 'array':
+        lns: set[int] = set()
+        arr = []
+        for i in obj:
+            lns.add(len(i))
+            arr = arr + i
+        schema['items'] = _complete_schema(schema['items'], arr, threshold=threshold)
+        schema['minItems'] = min(lns)
+        schema['maxItems'] = max(lns)
+        return schema
+    if typ not in ('string', 'integer'):
+        return schema
+    vals = sorted(set(obj))
+    if len(vals) <= threshold:
+        if hasNull:
+            vals.insert(0, None)
+        schema['enum'] = vals
+        return schema
+    if typ == 'integer':
+        schema['minimum'] = vals[0]
+        schema['maximum'] = vals[-1]
+    if typ == 'string':
+        lvls = sorted(map(len, vals))
+        schema['minLength'] = lvls[0]
+        schema['maxLength'] = lvls[-1]
+    return schema
 
 
 class FileManager:
@@ -82,7 +132,7 @@ class FileManager:
             "ics": "txt"
         }.get(ext, ext)
 
-    def load(self, file, *args, **kargv):
+    def load(self, file, *args, **kwargs):
         """
         Lee un fichero en funcion de su extension
         Para que haya soporte para esa extension ha de exisitir una funcion load_extension
@@ -96,13 +146,13 @@ class FileManager:
             raise Exception(
                 "No existe metodo para leer ficheros {} [{}]".format(ext, file.name))
 
-        return load_fl(file, *args, **kargv)
+        return load_fl(file, *args, **kwargs)
 
     @cache
-    def cached_load(self, file, *args, **kargv):
-        return self.load(file, *args, **kargv)
+    def cached_load(self, file, *args, **kwargs):
+        return self.load(file, *args, **kwargs)
 
-    def dump(self, file, obj, *args, **kargv):
+    def dump(self, file, obj, *args, **kwargs):
         """
         Guarda un fichero en funcion de su extension
         Para que haya soporte para esa extension ha de exisitir una funcion dump_extension
@@ -117,7 +167,7 @@ class FileManager:
             raise Exception(
                 "No existe metodo para guardar ficheros {} [{}]".format(ext, file.name))
 
-        dump_fl(file, obj, *args, **kargv)
+        dump_fl(file, obj, *args, **kwargs)
 
     def dwn(self, file, url, verify=True, overwrite=False, headers=None):
         """
@@ -139,37 +189,59 @@ class FileManager:
             with open(file, "wb") as f:
                 f.write(r.content)
 
-    def load_json(self, file, *args, **kargv):
+    def load_json(self, file, *args, **kwargs):
         with open(file, "r") as f:
             try:
-                return json.load(f, *args, **kargv)
+                return json.load(f, *args, **kwargs)
             except JSONDecodeError as e:
                 raise myex(e, str(file))
 
-    def dump_json(self, file, obj, *args, indent=2, **kargv):
+    def dump_json(self, file, obj, *args, indent=2, mk_schema=False, **kwargs):
         with open(file, "w") as f:
-            json.dump(self.__parse(obj), f, *args, indent=indent, **kargv)
+            json.dump(self.__parse(obj), f, *args, indent=indent, **kwargs)
+        if mk_schema:
+            schema_file = str(file).rsplit(".", 1)[0]+'.schema.json'
+            self.dump_json_schema(schema_file, file, indent=indent)
 
-    def load_html(self, file, *args, parser="lxml", **kargv):
+    def mk_json_schema(self, file: str, out: str = None):
+        obj = self.load(file)
+        schema_file = out or str(file).rsplit(".", 1)[0]+'.schema.json'
+        self.dump_json_schema(schema_file, obj)
+
+    def dump_json_schema(self, file, obj, indent=2):
+        obj = self.get_schema(obj)
+        self.dump(file, obj, indent=indent)
+
+    def get_schema(self, obj):
+        builder = SchemaBuilder()
+        if not isinstance(obj, (list, tuple)):
+            obj = [obj]
+        for o in obj:
+            builder.add_object(o)
+        schema = builder.to_schema()
+        _complete_schema(schema, obj)
+        return schema
+
+    def load_html(self, file, *args, parser="lxml", **kwargs):
         with open(file, "r") as f:
             return BeautifulSoup(f.read(), parser)
 
-    def dump_html(self, file, obj, *args, **kargv):
+    def dump_html(self, file, obj, *args, **kwargs):
         if isinstance(obj, (BeautifulSoup, Tag)):
             obj = str(obj)
         with open(file, "w") as f:
             f.write(obj)
 
-    def load_txt(self, file, *args, **kargv):
+    def load_txt(self, file, *args, **kwargs):
         with open(file, "r") as f:
             txt = f.read()
-            if args or kargv:
-                txt = txt.format(*args, **kargv)
+            if args or kwargs:
+                txt = txt.format(*args, **kwargs)
             return txt
 
-    def dump_txt(self, file, txt, *args, **kargv):
-        if args or kargv:
-            txt = txt.format(*args, **kargv)
+    def dump_txt(self, file, txt, *args, **kwargs):
+        if args or kwargs:
+            txt = txt.format(*args, **kwargs)
         with open(file, "w") as f:
             f.write(txt)
 

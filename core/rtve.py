@@ -5,7 +5,6 @@ import json
 from collections import defaultdict
 from typing import Any
 from bs4 import Tag
-from core.filemanager import FM
 import logging
 from core.cache import Cache
 from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float, dict_walk_positive
@@ -476,7 +475,12 @@ class Rtve(Web):
 
 
 if __name__ == "__main__":
+    from core.filemanager import FM
+    from glob import glob
     r = Rtve()
-    x = r.films  # r.get_ids("https://www.rtve.es/play/modulos/collection/3557/?skin=rtve-play-tematicas&pos=10&home=true&noLabels=false&distribution=slide")
-    print(len(r.films), "resultados")
-    FM.dump("rec/rtve.json", r.films)
+    v = r.get_videos(*r.urls)
+    arr = []
+    for i in glob("rec/rtve/*.json"):
+        if re.match(r".*/\d+\.json", i):
+            arr.append(FM.load(i))
+    FM.dump_json_schema("rec/schema.rtve.json", arr)
