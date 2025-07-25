@@ -26,6 +26,7 @@ class Video(NamedTuple):
     director_name: str
     banner_main: str
     banner_trailer: str
+    provider_slug: str
 
     def get_url(self):
         return f'https://cinemadrid.efilm.online/audiovisual-detail/{self.id}/{self.slug}'
@@ -90,7 +91,8 @@ class EFilm:
                 covers=tuple(x['cover'] for x in (i.get('covers') or [])),
                 director_name=i.get('director_name'),
                 banner_main=i.get('banner_main'),
-                banner_trailer=i.get('banner_trailer')
+                banner_trailer=i.get('banner_trailer'),
+                provider_slug=i.get('provider_slug')
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda v: v.id))
@@ -100,9 +102,9 @@ if __name__ == "__main__":
     import sys
     from core.filemanager import FM
     e = EFilm()
-    #for v in e.get_videos()[:10]:
-    #    if v.typ != "game":
-    #        print(v.get_url())
+    for v in e.get_videos():
+        if v.typ != "game" and v.provider_slug == 'rtve':
+            print(v.get_url())
     #sys.exit()
     e.get_items()
     FM.mk_json_schema("rec/efilm/items.json", "rec/schema.efilm.json")

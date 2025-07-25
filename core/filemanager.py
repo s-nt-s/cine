@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup, Tag
 from json.decoder import JSONDecodeError
 from dataclasses import is_dataclass, asdict
 from genson import SchemaBuilder
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,29 @@ def _complete_schema(schema: dict, obj: list, threshold=20):
         lvls = sorted(map(len, vals))
         schema['minLength'] = lvls[0]
         schema['maxLength'] = lvls[-1]
+        pattern = _guess_pattern(vals)
+        if pattern:
+            schema['pattern'] = pattern
     return schema
+
+
+def _guess_pattern(vals: list[str]):
+    for r in (
+        r'\d{4}-\d{2}-\d{2}',
+        r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}',
+        r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}",
+        r"https?://\S+"
+        r'\d',
+    ):
+        r = r"^" + r + r"$"
+        if all(re.match(r, x) for x in vals):
+            return r
+    letters: set[str] = set()
+    for i in vals:
+        letters = letters.union(list(i))
+    if len(letters)<20:
+        re_letters = "".join(map(re.escape, sorted(letters)))
+        return '^['+re_letters+']+$'
 
 
 class FileManager:
