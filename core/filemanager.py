@@ -25,7 +25,7 @@ def myex(e, msg):
     return e
 
 
-def _complete_schema(schema: dict, obj: list, threshold=20):
+def _complete_schema(schema: dict, obj: list, threshold=60):
     if not isinstance(obj, list):
         return schema
     obj = [o for o in obj if o is not None]
@@ -78,12 +78,29 @@ def _complete_schema(schema: dict, obj: list, threshold=20):
 
 
 def _guess_pattern(vals: list[str]):
+    prefix = ""
+    for tp in zip(*vals):
+        if len(set(tp)) > 1:
+            break
+        prefix = prefix + tp[0]
+    if prefix:
+        pt = _guess_pattern([v[len(prefix):] for v in vals if v[len(prefix):]])
+        if pt:
+            return r"^" + re.escape(prefix) + pt[1:-1] + r"$"
+        return r"^" + re.escape(prefix) + r".+$"
     for r in (
+        r'\d+',
+        r"tt\d+",
         r'\d{4}-\d{2}-\d{2}',
         r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}',
         r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}",
+        r'[a-z]',
+        r'[A-Z]',
+        r'[a-z0-9]',
+        r'[A-Z0-9]',
+        r'[a-zA-Z]',
+        r'[a-zA-Z0-9]',
         r"https?://\S+"
-        r'\d',
     ):
         r = r"^" + r + r"$"
         if all(re.match(r, x) for x in vals):
@@ -91,9 +108,15 @@ def _guess_pattern(vals: list[str]):
     letters: set[str] = set()
     for i in vals:
         letters = letters.union(list(i))
-    if len(letters)<20:
+    if len(letters) < 20:
         re_letters = "".join(map(re.escape, sorted(letters)))
         return '^['+re_letters+']+$'
+    for r in (
+        r'\S+',
+    ):
+        r = r"^" + r + r"$"
+        if all(re.match(r, x) for x in vals):
+            return r
 
 
 class FileManager:
