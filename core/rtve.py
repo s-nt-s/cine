@@ -468,7 +468,7 @@ class Rtve(Web):
             films.add(f)
         return tuple(sorted(films, key=lambda x: (x.title, x.id)))
 
-    @Cache("rec/rtve/{}.json")
+    @Cache("rec/rtve/ficha/{}.json")
     def get_ficha(self, id: int) -> dict[str, Any]:
         js = self.json(f"https://api.rtve.es/api/videos/{id}.json")
         return mapdict(_clean_js, js['page']['items'][0], compact=True)
@@ -479,8 +479,3 @@ if __name__ == "__main__":
     from glob import glob
     r = Rtve()
     v = r.get_videos(*r.urls)
-    arr = []
-    for i in glob("rec/rtve/*.json"):
-        if re.match(r".*/\d+\.json", i):
-            arr.append(FM.load(i))
-    FM.dump_json_schema("rec/schema.rtve.json", arr)

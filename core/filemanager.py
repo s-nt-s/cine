@@ -9,8 +9,6 @@ import requests
 from bs4 import BeautifulSoup, Tag
 from json.decoder import JSONDecodeError
 from dataclasses import is_dataclass, asdict
-from genson import SchemaBuilder
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -23,103 +21,6 @@ def myex(e, msg):
         largs.append(msg)
     e.args = tuple(largs)
     return e
-
-
-def _complete_schema(schema: dict, obj: list, threshold=60):
-    if not isinstance(obj, list):
-        return schema
-    obj = [o for o in obj if o is not None]
-    if len(obj) == 0:
-        return schema
-    schema_type = schema['type']
-    typ = None
-    hasNull = None
-    if isinstance(schema_type, str):
-        typ = schema_type
-        hasNull = False
-    elif isinstance(schema_type, list):
-        st = tuple(sorted((s for s in schema_type if s not in ("null", None))))
-        hasNull = len(st) < len(schema_type)
-        if len(st) == 1:
-            typ = st[0]
-    if typ == 'object':
-        for k, v in list(schema['properties'].items()):
-            schema['properties'][k] = _complete_schema(v, [o.get(k) for o in obj], threshold=threshold)
-        return schema
-    if typ == 'array':
-        lns: set[int] = set()
-        arr = []
-        for i in obj:
-            lns.add(len(i))
-            arr = arr + i
-        schema['items'] = _complete_schema(schema['items'], arr, threshold=threshold)
-        schema['minItems'] = min(lns)
-        schema['maxItems'] = max(lns)
-        return schema
-    if typ not in ('string', 'integer'):
-        return schema
-    vals = sorted(set(obj))
-    if len(vals) <= threshold:
-        if hasNull:
-            vals.insert(0, None)
-        schema['enum'] = vals
-        return schema
-    if typ == 'integer':
-        schema['minimum'] = vals[0]
-        schema['maximum'] = vals[-1]
-    if typ == 'string':
-        lvls = sorted(map(len, vals))
-        schema['minLength'] = lvls[0]
-        schema['maxLength'] = lvls[-1]
-        pattern = _guess_pattern(vals)
-        if pattern:
-            schema['pattern'] = pattern
-    return schema
-
-
-def _guess_pattern(vals: list[str]):
-    prefix = ""
-    suffix = ""
-    for tp in zip(*vals):
-        if len(set(tp)) > 1:
-            break
-        prefix = prefix + tp[0]
-    for tp in zip(*["".join(reversed(v)) for v in vals]):
-        if len(set(tp)) > 1:
-            break
-        suffix = tp[0] + suffix
-    if prefix or suffix:
-        pt = _guess_pattern([v[len(prefix):-len(suffix)] for v in vals if v[len(prefix):-len(suffix)]]) or r"^.+$"
-        return r"^" + re.escape(prefix) + pt[1:-1] + re.escape(suffix) + r"$"
-    for r in (
-        r'\d+',
-        r"tt\d+",
-        r'\d{4}-\d{2}-\d{2}',
-        r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}',
-        r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}",
-        r'[a-z]',
-        r'[A-Z]',
-        r'[a-z0-9]',
-        r'[A-Z0-9]',
-        r'[a-zA-Z]',
-        r'[a-zA-Z0-9]',
-        r"https?://\S+"
-    ):
-        r = r"^" + r + r"$"
-        if all(re.match(r, x) for x in vals):
-            return r
-    letters: set[str] = set()
-    for i in vals:
-        letters = letters.union(list(i))
-    if len(letters) < 20:
-        re_letters = "".join(map(re.escape, sorted(letters)))
-        return '^['+re_letters+']+$'
-    for r in (
-        r'\S+',
-    ):
-        r = r"^" + r + r"$"
-        if all(re.match(r, x) for x in vals):
-            return r
 
 
 class FileManager:
@@ -245,31 +146,9 @@ class FileManager:
             except JSONDecodeError as e:
                 raise myex(e, str(file))
 
-    def dump_json(self, file, obj, *args, indent=2, mk_schema=False, **kwargs):
+    def dump_json(self, file, obj, *args, indent=2, **kwargs):
         with open(file, "w") as f:
             json.dump(self.__parse(obj), f, *args, indent=indent, **kwargs)
-        if mk_schema:
-            schema_file = str(file).rsplit(".", 1)[0]+'.schema.json'
-            self.dump_json_schema(schema_file, file, indent=indent)
-
-    def mk_json_schema(self, file: str, out: str = None):
-        obj = self.load(file)
-        schema_file = out or str(file).rsplit(".", 1)[0]+'.schema.json'
-        self.dump_json_schema(schema_file, obj)
-
-    def dump_json_schema(self, file, obj, indent=2):
-        obj = self.get_schema(obj)
-        self.dump(file, obj, indent=indent)
-
-    def get_schema(self, obj):
-        builder = SchemaBuilder()
-        if not isinstance(obj, (list, tuple)):
-            obj = [obj]
-        for o in obj:
-            builder.add_object(o)
-        schema = builder.to_schema()
-        _complete_schema(schema, obj)
-        return schema
 
     def load_html(self, file, *args, parser="lxml", **kwargs):
         with open(file, "r") as f:
@@ -304,6 +183,15 @@ class FileManager:
         if isinstance(obj, dict):
             obj = {k: self.__parse(v) for k, v in obj.items()}
         return obj
+
+    def rm(self, file: str | Path):
+        file = self.resolve_path(file)
+        if not file.exists():
+            return
+        if file.is_file():
+            file.unlink()
+        elif file.is_dir():
+            file.rmdir()
 
 
 # Mejoras dinamicas en la documentacion

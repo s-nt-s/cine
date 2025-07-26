@@ -27,9 +27,15 @@ class Video(NamedTuple):
     banner_main: str
     banner_trailer: str
     provider_slug: str
+    provider: str
+    gamma: str
+
+    @staticmethod
+    def mk_url(id: int, slug: str):
+        return f'https://cinemadrid.efilm.online/audiovisual-detail/{id}/{slug}'
 
     def get_url(self):
-        return f'https://cinemadrid.efilm.online/audiovisual-detail/{self.id}/{self.slug}'
+        return Video.mk_url(self.id, self.slug)
 
 
 def _clean_js(k: str, obj: list | dict | str):
@@ -67,11 +73,39 @@ class EFilm:
         done: set[int] = set()
         arr = []
         js = self.get_json("https://backend-prod.efilm.online/api/v1/products/products/relevant/?page=1&page_size=9999&skip_chapters=true")
+        i: dict
         for i in mapdict(_clean_js, js, compact=True):
             if i['id'] not in done:
+                errors = self.__get_errors(i)
+                if errors:
+                    url = Video.mk_url(i['id'], i.get('slug'))
+                    logger.debug(f"[KO] {', '.join(errors)} {url}")
+                    continue
                 arr.append(i)
                 done.add(i['id'])
         return arr
+
+    def __get_errors(self, i: dict):
+        arr: list[str] = []
+        typ = i.get('type')
+        provider = (i.get('provider') or {}).get('name')
+        genres = tuple(x['name'] for x in (i.get('genres') or []))
+        gamma = (i.get('gamma') or {}).get('name_show')
+        duration = i.get('duration', 999999)
+        director_name=i.get('director_name')
+        if typ in ('game', ):
+            arr.append(f'type={typ}')
+        if gamma in ('Azul', ):
+            arr.append(f'gamma={gamma}')
+        if director_name in (None, ""):
+            arr.append("director=None")
+        if duration < 10:
+            arr.append(f'duration={duration}')
+        #if set(genres).intersection({'Cultura', 'Documental'}):
+        #    arr.append(f'genres={genres}')
+        #if provider in ('Azteca', ):
+        #    arr.append(f'provider={provider}')
+        return tuple(arr)
 
     def get_videos(self):
         arr: set[Video] = set()
@@ -92,19 +126,22 @@ class EFilm:
                 director_name=i.get('director_name'),
                 banner_main=i.get('banner_main'),
                 banner_trailer=i.get('banner_trailer'),
-                provider_slug=i.get('provider_slug')
+                provider_slug=i.get('provider_slug'),
+                provider=(i.get('provider') or {}).get('name'),
+                gamma=(i.get('gamma') or {}).get('name_show')
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda v: v.id))
 
 
 if __name__ == "__main__":
+    from core.log import config_log
     import sys
     from core.filemanager import FM
+    config_log("log/efilm.log")
     e = EFilm()
     for v in e.get_videos():
-        if v.typ != "game" and v.provider_slug == 'rtve':
+        if v.genres == ('Documental', ):
             print(v.get_url())
     #sys.exit()
     e.get_items()
-    FM.mk_json_schema("rec/efilm/items.json", "rec/schema.efilm.json")
