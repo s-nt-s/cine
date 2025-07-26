@@ -79,15 +79,18 @@ def _complete_schema(schema: dict, obj: list, threshold=60):
 
 def _guess_pattern(vals: list[str]):
     prefix = ""
+    suffix = ""
     for tp in zip(*vals):
         if len(set(tp)) > 1:
             break
         prefix = prefix + tp[0]
-    if prefix:
-        pt = _guess_pattern([v[len(prefix):] for v in vals if v[len(prefix):]])
-        if pt:
-            return r"^" + re.escape(prefix) + pt[1:-1] + r"$"
-        return r"^" + re.escape(prefix) + r".+$"
+    for tp in zip(*["".join(reversed(v)) for v in vals]):
+        if len(set(tp)) > 1:
+            break
+        suffix = tp[0] + suffix
+    if prefix or suffix:
+        pt = _guess_pattern([v[len(prefix):-len(suffix)] for v in vals if v[len(prefix):-len(suffix)]]) or r"^.+$"
+        return r"^" + re.escape(prefix) + pt[1:-1] + re.escape(suffix) + r"$"
     for r in (
         r'\d+',
         r"tt\d+",
