@@ -6,8 +6,18 @@ from requests.exceptions import JSONDecodeError
 from typing import NamedTuple
 import logging
 import time
+from core.util import tp_split
+from functools import cached_property
+from core.film import Film
+
 
 logger = logging.getLogger(__name__)
+
+
+def _get_first(*args):
+    for a in args:
+        if a is not None:
+            return a
 
 
 class Video(NamedTuple):
@@ -47,8 +57,15 @@ def _clean_js(k: str, obj: list | dict | str):
 
 
 class EFilm:
-    def __init__(self):
+    def __init__(self, origin: str):
         self.__s = requests.Session()
+        self.__origin = origin
+        self.__s.headers.update({
+            'Accept-Language': 'es',
+            'localization': '{"codeCountry":"ES","city":"Madrid"}',
+            'Origin': self.__origin,
+            'Referer': self.__origin,
+        })
 
     def get_json(self, url: str) -> list[dict[str, Any]]:
         max_tries = 3
@@ -64,15 +81,23 @@ class EFilm:
             except JSONDecodeError:
                 logger.critical(f"{r.status_code} {url}")
                 raise
+            if isinstance(js, list) and len(js) == 1:
+                js = js[0]
             result.extend(js['results'])
             url = js['next']
         return result
+
+    def get_audiovisual(self):
+        "https://backend-prod.efilm.online/api/v1/videos/audiovisuals/audiovisual_type/?audiovisual_type=Pel%C3%ADculas"
 
     @Cache("rec/efilm/items.json")
     def get_items(self) -> list[dict]:
         done: set[int] = set()
         arr = []
-        js = self.get_json("https://backend-prod.efilm.online/api/v1/products/products/relevant/?page=1&page_size=9999&skip_chapters=true")
+        js = self.get_json(
+            #"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/audiovisual_type/?audiovisual_type=Pel%C3%ADculas"
+            "https://backend-prod.efilm.online/api/v1/products/products/relevant/?page=1&page_size=9999&skip_chapters=true"
+        )
         i: dict
         for i in mapdict(_clean_js, js, compact=True):
             if i['id'] not in done:
@@ -132,6 +157,36 @@ class EFilm:
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda v: v.id))
+
+    @cached_property
+    def films(self):
+        arr: set[Film] = set()
+        for v in self.get_videos():
+            if v.gamma != "Verde":
+                continue
+            v = Film(
+                source="efilm",
+                id=v.id,
+                title=v.name,
+                url=v.get_url(),
+                img=_get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
+                lang=None,
+                country=tuple(),
+                description=v.description,
+                year=v.year,
+                expiration=None,
+                publication=None,
+                duration=v.duration,
+                imdb=None,
+                wiki=None,
+                filmaffinity=None,
+                director=tp_split("/", v.director_name),
+                casting=v.actors,
+                genres=v.genres,
+                program=None
+            )
+            arr.add(v)
+        return tuple(sorted(arr, key=lambda x: x.id))
 
 
 if __name__ == "__main__":
