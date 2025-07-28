@@ -166,8 +166,8 @@ class EFilm:
             arr.append(f'duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        #if provider in ('Azteca', ):
-        #    arr.append(f'provider={provider}')
+        if provider in ('Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
+            arr.append(f'provider={provider}')
         return tuple(arr)
 
     @Cache("rec/efilm/ficha/{}.json")
