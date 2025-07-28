@@ -57,8 +57,9 @@ def _clean_js(k: str, obj: list | dict | str):
 
 
 class EFilm:
-    def __init__(self, origin: str):
+    def __init__(self, origin: str, min_duration=50):
         self.__s = requests.Session()
+        self.__min_duration = min_duration
         self.__origin = origin
         self.__s.headers.update({
             'Accept-Language': 'es',
@@ -67,20 +68,27 @@ class EFilm:
             'Referer': self.__origin,
         })
 
-    def get_json(self, url: str) -> list[dict[str, Any]]:
+    def get_json(self, url: str):
         max_tries = 3
-        result = []
-        while url:
+        logger.debug(url)
+        while True:
             r = self.__s.get(url)
             if max_tries > 0 and r.status_code == 500:
                 max_tries = max_tries - 1
                 time.sleep(5)
                 continue
             try:
-                js = r.json()
+                return r.json()
             except JSONDecodeError:
                 logger.critical(f"{r.status_code} {url}")
                 raise
+
+    def get_list(self, url: str) -> list[dict[str, Any]]:
+        prc = url.split("://")[0]
+        result = []
+        while url:
+            url = f"{prc}://" + url.split("://", 1)[1]
+            js = self.get_json(url)
             if isinstance(js, list) and len(js) == 1:
                 js = js[0]
             result.extend(js['results'])
@@ -92,22 +100,27 @@ class EFilm:
 
     @Cache("rec/efilm/items.json")
     def get_items(self) -> list[dict]:
+        root = f"https://backend-prod.efilm.online/api/v1/products/products/relevant/?duration_gte={self.__min_duration}&page=1&page_size=9999&product_type=audiovisual&skip_chapters=true"
         done: set[int] = set()
         arr = []
-        js = self.get_json(
-            #"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/audiovisual_type/?audiovisual_type=Pel%C3%ADculas"
-            "https://backend-prod.efilm.online/api/v1/products/products/relevant/?page=1&page_size=9999&skip_chapters=true"
-        )
         i: dict
-        for i in mapdict(_clean_js, js, compact=True):
-            if i['id'] not in done:
-                errors = self.__get_errors(i)
-                if errors:
-                    url = Video.mk_url(i['id'], i.get('slug'))
-                    logger.debug(f"[KO] {', '.join(errors)} {url}")
-                    continue
-                arr.append(i)
-                done.add(i['id'])
+        for query in (
+            "&languages=1",
+            "&subtitles=1"
+        ):
+            js = self.get_list(
+                #"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/audiovisual_type/?audiovisual_type=Pel%C3%ADculas"
+                root+query
+            )
+            for i in mapdict(_clean_js, js, compact=True):
+                if i['id'] not in done:
+                    done.add(i['id'])
+                    errors = self.__get_errors(i)
+                    if errors:
+                        url = Video.mk_url(i['id'], i.get('slug'))
+                        logger.debug(f"[KO] {', '.join(errors)} {url}")
+                        continue
+                    arr.append(i)
         return arr
 
     def __get_errors(self, i: dict):
@@ -124,13 +137,20 @@ class EFilm:
             arr.append(f'gamma={gamma}')
         if director_name in (None, ""):
             arr.append("director=None")
-        if duration < 10:
+        if duration < self.__min_duration:
             arr.append(f'duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
         #if provider in ('Azteca', ):
         #    arr.append(f'provider={provider}')
         return tuple(arr)
+
+    @Cache("rec/efilm/ficha/{}.json")
+    def get_ficha(self, id: int):
+        url = f"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/{id}/"
+        js = self.get_json(url)
+        js = mapdict(_clean_js, js, compact=True)
+        return js
 
     def get_videos(self):
         arr: set[Video] = set()
@@ -155,6 +175,7 @@ class EFilm:
                 provider=(i.get('provider') or {}).get('name'),
                 gamma=(i.get('gamma') or {}).get('name_show')
             )
+            self.get_ficha(v.id)
             arr.add(v)
         return tuple(sorted(arr, key=lambda v: v.id))
 

@@ -12,7 +12,7 @@ import re
 from datetime import date
 
 
-config_log("log/build_site.log")
+config_log("log/build_efilm.log")
 logger = logging.getLogger(__name__)
 
 NOW = datetime.now()
