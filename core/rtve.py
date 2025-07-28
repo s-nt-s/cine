@@ -304,7 +304,7 @@ class Rtve(Web):
                 url=v.url,
                 img=self.__get_img(v, imdb_info),
                 program=v.programTitle,
-                lang=v.language,
+                lang=(v.language, ) if v.language else tuple(),
                 description=v.description,
                 year=v.productionDate or imdb_info.year,
                 expiration=v.expirationDate,

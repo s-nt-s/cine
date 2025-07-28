@@ -9,7 +9,8 @@ import time
 from core.util import tp_split
 from functools import cached_property
 from core.film import Film
-
+from core.country import to_country
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,16 @@ def _get_first(*args):
     for a in args:
         if a is not None:
             return a
+
+
+def _to_tuple(*args, exclude: tuple = None):
+    arr = []
+    for a in args:
+        if a is not None and a not in arr:
+            if exclude and a in exclude:
+                continue
+            arr.append(a)
+    return tuple(arr)
 
 
 class Video(NamedTuple):
@@ -39,6 +50,11 @@ class Video(NamedTuple):
     provider_slug: str
     provider: str
     gamma: str
+    lang: tuple[str, ...]
+    subtitle: tuple[str, ...]
+    countries: tuple[str, ...]
+    created: str
+    expire: str
 
     @staticmethod
     def mk_url(id: int, slug: str):
@@ -54,6 +70,15 @@ def _clean_js(k: str, obj: list | dict | str):
         if len(obj) == 0:
             return None
     return obj
+
+
+def _g_date(dt: str):
+    if dt is None:
+        return None
+    num = tuple(map(int, re.findall(r"\d+", dt)))
+    if len(num) == 3:
+        return "{0:04d}-{1:02d}-{2:02d}".format(*num)
+    return "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}".format(*num)
 
 
 class EFilm:
@@ -155,6 +180,15 @@ class EFilm:
     def get_videos(self):
         arr: set[Video] = set()
         for i in self.get_items():
+            ficha = self.get_ficha(i['id'])
+            lang = []
+            subt = []
+            coun = []
+            for ln in (ficha.get('languages') or []):
+                lang.append((ln.get('language') or {}).get('code_iso3'))
+                lang.append((ln.get('subtitle') or {}).get('code_iso3'))
+            for ct in (ficha.get('countries') or []):
+                coun.append(ct.get('code'))
             v = Video(
                 id=i['id'],
                 name=i.get('name'),
@@ -173,9 +207,16 @@ class EFilm:
                 banner_trailer=i.get('banner_trailer'),
                 provider_slug=i.get('provider_slug'),
                 provider=(i.get('provider') or {}).get('name'),
-                gamma=(i.get('gamma') or {}).get('name_show')
+                gamma=(i.get('gamma') or {}).get('name_show'),
+                lang=_to_tuple(*lang, exclude=('mud','mis')),
+                subtitle=_to_tuple(*subt, exclude=('mis', )),
+                countries=_to_tuple(*coun),
+                created=ficha.get('created'),
+                expire=ficha.get('expire')
             )
-            self.get_ficha(v.id)
+            if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
+                logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
+                continue
             arr.add(v)
         return tuple(sorted(arr, key=lambda v: v.id))
 
@@ -183,20 +224,18 @@ class EFilm:
     def films(self):
         arr: set[Film] = set()
         for v in self.get_videos():
-            if v.gamma != "Verde":
-                continue
             v = Film(
                 source="efilm",
                 id=v.id,
                 title=v.name,
                 url=v.get_url(),
                 img=_get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
-                lang=None,
-                country=tuple(),
+                lang=v.lang,
+                country=tuple(map(to_country, v.countries)),
                 description=v.description,
                 year=v.year,
-                expiration=None,
-                publication=None,
+                expiration=_g_date(v.expire),
+                publication=_g_date(v.created),
                 duration=v.duration,
                 imdb=None,
                 wiki=None,

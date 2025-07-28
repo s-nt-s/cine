@@ -33,7 +33,7 @@ class Film(NamedTuple):
     title: str
     img: str
     program: str
-    lang: str
+    lang: tuple[str, ...]
     country: tuple[tuple[str, str], ...]
     description: str
     year: int

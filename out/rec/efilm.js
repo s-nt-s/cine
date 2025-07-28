@@ -231,8 +231,13 @@ function ifLocal() {
   const gId = (s) => {
     while (s.endsWith("/")) s = s.substring(0, s.length-1);
     const spl = s.split("/");
-    return spl[spl.length-1];
+    return spl[spl.length-2];
   }
+  document.querySelectorAll("div.film").forEach(i=>{
+    const p = i.querySelector("p");
+    const tit = i.querySelector("a.title");
+    tit.append(" ", mkA(`../../rec/efilm/ficha/${gId(tit.href)}.json`));
+  })
 }
 
 
@@ -274,6 +279,27 @@ function exp_to_msg(d) {
 }
 
 
+function addExpirationInfo() {
+  if (EXPIRATION==null) return null;
+  const min_date = EXPIRATION.get('__min__');
+  if (min_date==null) return;
+  const diffMs = min_date - TODAY;
+  const min_days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  EXPIRATION.entries().forEach(([k, v])=>{
+    const n = document.querySelector("#"+k+" .expiration");
+    if (n==null) return;
+    const days = min_days + v;
+    const msg = exp_to_msg(days);
+    const de = n.getAttribute("data-expiration");
+    n.textContent = msg[0].toLocaleLowerCase();
+    n.title = msg[1]+" ("+de.substring(0, 10)+")";
+    if (msg[0]=="∞") {
+      n.classList.remove("exp");
+      n.classList.add("no_exp");
+    }
+  })
+}
+
 document.addEventListener(
   "DOMContentLoaded",
   () => {
@@ -281,6 +307,7 @@ document.addEventListener(
       $$("input[id$=_max],input[id$=_min]").filter(n => !n.disabled).map((n) =>
         n.id.replace(/_(max|min)$/, "")
       ))));
+    addExpirationInfo();
     setOrder();
     ifLocal();
     FormQuery.query_to_form();

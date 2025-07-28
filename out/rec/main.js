@@ -238,7 +238,7 @@ function ifLocal() {
     const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
-    if (rtve) p.append(" ", mkA(`../rec/rtve/${gId(rtve.href)}.json`));
+    if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href)}.json`));
     if (imdb) p.append(" ", mkA(`../rec/imdb/${gId(imdb.href)}.json`));
   })
 }

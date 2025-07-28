@@ -23,7 +23,9 @@ class Country(NamedTuple):
 
 
 def search_country(name):
-    c: DBCountry = DBCountries.get(name=name)
+    c: DBCountry = \
+        DBCountries.get(alpha_2=name) or \
+        DBCountries.get(name=name)
     if c is not None:
         return c
     lw_name = name.lower()
@@ -35,7 +37,8 @@ def search_country(name):
                     return c
     alias = {
         "russia": "Russian Federation",
-        "turkey": "Türkiye"
+        "turkey": "Türkiye",
+        "uk": "GB"
     }.get(lw_name)
     if alias:
         return search_country(alias)
