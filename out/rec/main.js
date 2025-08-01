@@ -286,7 +286,7 @@ function addExpirationInfo() {
   if (min_date==null) return;
   const diffMs = min_date - TODAY;
   const min_days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  EXPIRATION.entries().forEach(([k, v])=>{
+  Array.from(EXPIRATION.entries()).forEach(([k, v])=>{
     const n = document.querySelector("#"+k+" .expiration");
     if (n==null) return;
     const days = min_days + v;
