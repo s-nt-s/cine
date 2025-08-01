@@ -246,8 +246,9 @@ class EFilm:
                 genres=v.genres,
                 program=None
             )
+            imdb = DB.search_imdb_id(v.title, v.year, v.director)
             v._replace(
-                imdb=DB.search_imdb(v.title, v.year, v.director)
+                imdb=DB.get_imdb_info(imdb)
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda x: x.id))

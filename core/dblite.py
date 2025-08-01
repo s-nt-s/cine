@@ -3,6 +3,7 @@ from sqlite3 import OperationalError, connect
 from atexit import register
 import logging
 from functools import cache
+from core.film import IMDb
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,11 @@ def gW(tp: tuple):
         return "= ?"
     prm = ", ".join(['?'] * len(tp))
     return f"in ({prm})"
+
+
+def escape_fts5(text: str) -> str:
+    text = text.replace('"', '""')
+    return f'"{text}"'
 
 
 class DBlite:
@@ -50,6 +56,10 @@ class DBlite:
             yield r
         cursor.close()
 
+    def one(self, sql: str, *args, **kwargs):
+        for r in self.select(sql, *args, **kwargs):
+            return r[0] if len(r) == 1 else r
+
     def to_tuple(self, *args, **kwargs):
         arr = []
         for i in self.select(*args, **kwargs):
@@ -78,15 +88,16 @@ class DBlite:
         name = name.strip().lower()
         if len(name) == 0:
             return tuple()
-        sql = "select id from person where {w}"
+        sql = "select id from {t} where {w}"
         if category:
             sql = sql + f" and id in (select person from worker where category='{category}')"
-        for w in (
-            "lower(name) = ?",
-            "? like ('%' || lower(name) || '%')",
-            "lower(name) like ('%' || ? || '%')"
+        for t, w in (
+            ('PERSON', "lower(name) = ? COLLATE NOCASE"),
+            ('PERSON_FTS', "name MATCH ?"),
+            #('', "lower(name) like ('%' || ? || '%')")
         ):
-            ids = self.to_tuple(sql.format(w=w), name)
+            n = escape_fts5(name) if t.endswith("_FTS") else name
+            ids = self.to_tuple(sql.format(t=t, w=w), n)
             if len(ids):
                 return ids
         return tuple()
@@ -97,7 +108,34 @@ class DBlite:
             p = p.union(self.__search_person(n, category=category))
         return tuple(sorted(p))
 
-    def search_imdb(self, title: str, year: int, director: tuple[str, ...] = None) -> int | None:
+    @cache
+    def get_imdb_info(self, id: str):
+        if not isinstance(id, str):
+            return None
+        row = self.one("""
+            select
+                type,
+                year,
+                duration,
+                rating,
+                votes,
+                filmaffinity,
+                wikipedia,
+                countries
+            from
+                movie m left join
+                extra e on m.id=e.movie
+            where id = ?
+        """, id)
+        if row is None:
+            return None
+        return IMDb(
+            id=id,
+            rate=row[3],
+            votes=row[4]
+        )
+
+    def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None) -> int | None:
         if not isinstance(year, int):
             return None
         years = [year]
@@ -107,7 +145,6 @@ class DBlite:
         for y in years:
             id = self.__search_imdb(title, y, director)
             if id is not None:
-                print(id)
                 return id
         return None
 
@@ -119,12 +156,13 @@ class DBlite:
         if len(title) == 0:
             return tuple()
         arr = []
-        for w in (
-            "lower(title) = ?",
-            "? like ('%' || lower(title) || '%')",
-            "lower(title) like ('%' || ? || '%')"
+        for t, w in (
+            ('TITLE', "title = ? COLLATE NOCASE"),
+            ('TITLE_FTS', "title MATCH ?"),
+            #"lower(title) like ('%' || ? || '%')"
         ):
-            ids = self.to_tuple(f"select movie from title where {w}", title)
+            tt = escape_fts5(title) if t.endswith("_FTS") else title
+            ids = self.to_tuple(f"select movie from {t} where {w}", tt)
             if len(ids):
                 arr.append(ids)
         return tuple(arr)
