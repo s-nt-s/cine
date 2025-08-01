@@ -11,6 +11,7 @@ from functools import cached_property
 from core.film import Film
 from core.country import to_country
 import re
+from core.dblite import DB
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +245,9 @@ class EFilm:
                 casting=v.actors,
                 genres=v.genres,
                 program=None
+            )
+            v._replace(
+                imdb=DB.search_imdb(v.title, v.year, v.director)
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda x: x.id))

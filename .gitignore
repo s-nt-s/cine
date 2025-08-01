@@ -1,3 +1,4 @@
+imdb.sqlite
 rec/
 out/*
 !out/rec/
