@@ -7,9 +7,6 @@ from typing import NamedTuple
 import logging
 import time
 from core.util import tp_split
-from functools import cached_property
-from core.film import Film
-from core.country import to_country
 import re
 from core.dblite import DB
 from core.filemanager import FM, DictFile
@@ -160,7 +157,7 @@ class EFilm:
         genres = tuple(x['name'] for x in (i.get('genres') or []))
         gamma = (i.get('gamma') or {}).get('name_show')
         duration = i.get('duration', 999999)
-        director_name=i.get('director_name')
+        director_name = i.get('director_name')
         if typ in ('game', ):
             arr.append(f'type={typ}')
         if gamma in ('Azul', ):
@@ -190,9 +187,13 @@ class EFilm:
             subt = []
             coun = []
             for ln in (ficha.get('languages') or []):
+                if not isinstance(ln, dict):
+                    raise ValueError(ln)
                 lang.append((ln.get('language') or {}).get('code_iso3'))
                 lang.append((ln.get('subtitle') or {}).get('code_iso3'))
             for ct in (ficha.get('countries') or []):
+                if not isinstance(ct, dict):
+                    raise ValueError(ct)
                 coun.append(ct.get('code'))
             v = Video(
                 id=i['id'],
@@ -232,38 +233,9 @@ class EFilm:
         self.__cache.dump()
         return tuple(sorted(arr, key=lambda v: v.id))
 
-    @cached_property
-    def films(self):
-        arr: set[Film] = set()
-        for v in self.get_videos():
-            v = Film(
-                source="efilm",
-                id=v.id,
-                title=v.name,
-                url=v.get_url(),
-                img=_get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
-                lang=v.lang,
-                country=tuple(map(to_country, v.countries)),
-                description=v.description,
-                year=v.year,
-                expiration=_g_date(v.expire),
-                publication=_g_date(v.created),
-                duration=v.duration,
-                imdb=DB.get_imdb_info(v.imdb),
-                wiki=None,
-                filmaffinity=None,
-                director=v.director,
-                casting=v.actors,
-                genres=v.genres,
-                program=None
-            )
-            arr.add(v)
-        return tuple(sorted(arr, key=lambda x: x.id))
-
 
 if __name__ == "__main__":
     from core.log import config_log
-    import sys
     from core.filemanager import FM
     config_log("log/efilm.log")
     e = EFilm()

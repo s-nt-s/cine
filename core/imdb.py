@@ -1,14 +1,15 @@
 from requests import Session
 from os import environ
 import logging
-from core.util import tp_split, re_or, mapdict, dict_walk, dict_walk_tuple, dict_walk_positive
+from core.util import tp_split, mapdict, dict_walk, dict_walk_tuple, dict_walk_positive
 from core.cache import Cache
 from functools import cache
 import re
-from core.db import DBCache, DB
 from core.web import buildSoup, get_text, WEB, find_by_text
 from core.wiki import WIKI
 from typing import NamedTuple, Optional
+from core.dblite import DB, dict_factory, gW
+from core.country import to_alpha_3
 
 
 logger = logging.getLogger(__name__)
@@ -46,27 +47,6 @@ def get_positive(data: dict, field: str):
     return i if i == val else val
 
 
-class DBIMDBWikiCache(DBCache):
-    def __init__(self, field):
-        super().__init__(
-            select=f"select {field} from IMDB_WIKI where id = %s",
-            insert=f"insert into IMDB_WIKI (id, {field}) values (%s, %s) ON CONFLICT (id) DO UPDATE SET {field} = EXCLUDED.{field}, updated=now()"
-        )
-
-    def read(self, *args):
-        val = super().read(*args)
-        if isinstance(val, list):
-            return tuple(val)
-        return val
-
-    def save(self, data, *args):
-        if isinstance(data, (list, tuple)) and len(data) == 0:
-            return
-        if isinstance(data, tuple):
-            data = list(data)
-        return DB.execute(self.insert, args + (data, ))
-
-
 class IMDBInfo(NamedTuple):
     id: str
     title: Optional[str] = None
@@ -92,43 +72,87 @@ class IMDBApi:
         self.__s = Session()
 
     @cache
-    @DBCache(
-        select="select json from OMBDAPI where id = %s and updated > NOW() - INTERVAL '30 days'",
-        insert="insert into OMBDAPI (id, json) values (%s, %s) ON CONFLICT (id) DO UPDATE SET json = EXCLUDED.json, updated=now()"
-    )
     def __get_from_omdbapi(self, id: str):
         r = self.__s.get(self.__omdbapi+id)
         js = r.json()
         return js
 
-    def get(self, id: str, completeWithImdb: bool = True, completeWithWiki: bool = True):
-        if id is None:
-            return IMDBInfo(id=None)
-        if not completeWithWiki:
-            data = self.__get_basic(id, completeWithImdb=completeWithImdb)
-        else:
-            data = self.__get(id)
-        if data is None:
-            return IMDBInfo(id=id)
-        return IMDBInfo(
-            id=id,
-            title=dict_walk(data, 'Title', instanceof=(str, type(None))),
-            director=dict_walk_tuple(data, 'Director'),
-            actor=dict_walk_tuple(data, 'Actors'),
-            rating=dict_walk_positive(data, 'imdbRating'),
-            votes=dict_walk_positive(data, 'imdbVotes'),
-            year=dict_walk_positive(data, 'Year'),
-            countries=tuple(self.__merge(
-                dict_walk(data, 'Country', instanceof=(list, type(None))),
-                dict_walk(data, 'wiki_countries', instanceof=(list, tuple, type(None)))
-            )),
-            wiki=dict_walk(data, 'wiki', instanceof=(str, type(None))),
-            awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
-            typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
-            genres=dict_walk_tuple(data, 'Genre'),
-            img=dict_walk(data, 'Poster', instanceof=(str, type(None))),
-            filmaffinity=dict_walk(data, 'filmaffinity', instanceof=(int, type(None))),
-        )
+    def get(self, *ids: str):
+        obj: dict[str, IMDBInfo] = dict()
+        for row in DB.select(f'''
+            select
+                  m.id,
+                  m.type,
+                  m.year,
+                  m.duration,
+                  m.rating,
+                  m.votes,
+                  e.filmaffinity,
+                  e.wikipedia,
+                  e.countries
+            from
+                  movie m left join extra e on e.movie=m.id
+            where
+                  id {gW(ids)}
+        ''', *ids, row_factory=dict_factory):
+            obj[row['id']] = IMDBInfo(
+                id=row['id'],
+                title=None,
+                director=None,
+                actor=None,
+                rating=row['rating'],
+                votes=row['votes'],
+                year=row['year'],
+                countries=tp_split(" ", row['countries']),
+                wiki=row['wikipedia'],
+                awards=None,
+                typ=row['type'],
+                genres=None,
+                img=None,
+                filmaffinity=row['filmaffinity']
+            )
+        countries: dict[str, tuple] = dict()
+        for i in sorted(set(ids).difference(obj.keys())):
+            data = self.__get_basic(i)
+            countries[i] = tuple(map(to_alpha_3, dict_walk(data, 'Country', instanceof=(list, type(None)))))
+            obj[i] = IMDBInfo(
+                id=i,
+                title=dict_walk(data, 'Title', instanceof=(str, type(None))),
+                director=dict_walk_tuple(data, 'Director'),
+                actor=dict_walk_tuple(data, 'Actors'),
+                rating=dict_walk_positive(data, 'imdbRating'),
+                votes=dict_walk_positive(data, 'imdbVotes'),
+                year=dict_walk_positive(data, 'Year'),
+                awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
+                typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
+                genres=dict_walk_tuple(data, 'Genre'),
+                img=dict_walk(data, 'Poster', instanceof=(str, type(None))),
+                countries=None,
+                wiki=None,
+                filmaffinity=None,
+            )
+        need_countries = []
+        need_wikipedia = []
+        need_filmaffinity = []
+        for i in obj.values():
+            if i.filmaffinity is None:
+                need_filmaffinity.append(i.id)
+            if i.wiki is None:
+                need_wikipedia.append(i.id)
+            if not i.countries:
+                need_countries.append(i.id)
+        for k, v in WIKI.get_wiki_url(*need_wikipedia).items():
+            obj[k] = obj[k]._replace(wiki=v)
+        for k, v in WIKI.get_filmaffinity(*need_filmaffinity).items():
+            obj[k] = obj[k]._replace(filmaffinity=v)
+        for k, c2 in WIKI.get_countries(*need_countries).items():
+            c1 = countries.get(i)
+            obj[k] = obj[k]._replace(countries=self.__merge(c1, c2))
+        for k, c1 in countries.items():
+            if not obj[k].countries:
+                obj[k] = obj[k]._replace(countries=c1)
+        return obj
+
 
     def __merge(self, countries1: list[str], countries2: list[str]):
         if not countries1:
@@ -141,33 +165,7 @@ class IMDBApi:
         return merge
 
     @cache
-    @Cache("rec/imdb/{}.json")
-    def __get(self, id: str):
-        data = self.__get_basic(id, completeWithImdb=True) or {}
-        data['filmaffinity'] = self.__get_filmaffinity_from_imdb(id)
-        data['wiki'] = self.__get_wiki_from_imdb(id)
-        data['wiki_countries'] = self.__get_countries_from_imdb(id)
-        data = {k: v for k, v in data.items() if v is not None}
-        if len(data) == 0:
-            return None
-        return data
-
-    @cache
-    @DBIMDBWikiCache("filmaffinity")
-    def __get_filmaffinity_from_imdb(self, imdb_id: str):
-        return WIKI.get_filmaffinity_from_imdb(imdb_id)
-
-    @cache
-    @DBIMDBWikiCache("wiki")
-    def __get_wiki_from_imdb(self, imdb_id: str):
-        return WIKI.get_wiki_url_from_imdb(imdb_id)
-
-    @cache
-    @DBIMDBWikiCache("countries")
-    def __get_countries_from_imdb(self, imdb_id: str):
-        return WIKI.get_countries_from_imdb(imdb_id)
-
-    def __get_basic(self, id: str, completeWithImdb=True):
+    def __get_basic(self, id: str):
         if id in (None, ""):
             return None
         if not isinstance(id, str):
@@ -180,7 +178,7 @@ class IMDBApi:
             logger.warning(f"IMDBApi: {id} = {js['Error']}")
         elif response is not True:
             logger.warning(f"IMDBApi: {id} Response = {response}")
-        if completeWithImdb and self.__need_info(js):
+        if self.__need_info(js):
             soup_js = self.__get_from_imdb(id)
             if isError:
                 return soup_js
@@ -234,67 +232,9 @@ class IMDBApi:
             return None
         return js
 
-    @DBCache(
-        select="select txt from URL_TXT where url = %s and updated > NOW() - INTERVAL '10 days'",
-        insert="insert into URL_TXT (url, txt) values (%s, %s) ON CONFLICT (url) DO UPDATE SET txt = EXCLUDED.txt, updated=now()"
-    )
     def __get_html(self, url):
         soup = WEB.get_cached_soup(url)
         return str(soup)
-
-    def get_id(self, title: str, year: int):
-        if re_or(title, "^Almodóvar, todo sobre ellas", flags=re.I):
-            return "tt6095626"
-        if re_or(title, "^De Salamanca a ninguna parte", flags=re.I):
-            return "tt0336249"
-        if re_or(title, "^Los comuneros$", flags=re.I) and year == 1978:
-            return "tt0573534"
-        if re_or(title, "^Fernando Méndez Leite. La memoria del cine", "La memoria del cine: una película sobre Fernando Méndez-Leite", flags=re.I):
-            return "tt26812553"
-        if re_or(title, "^Spanish Western", flags=re.I):
-            return "tt6728914"
-        if re_or(title, "^La primera mirada", flags=re.I):
-            return "tt32897831"
-        if re_or(title, "^Los habitantes de la casa deshabitada", flags=re.I):
-            return "tt7534332"
-        if re_or(title, "^Bolívar. El hombre de las dificultades", flags=re.I):
-            return "tt3104336"
-        if re_or(title, "^MAMA$", flags=re.I) and year == 2021:
-            return "tt12725124"
-        if re_or(title, "^El techo amarillo", flags=re.I) and year == 2022:
-            return "tt20112674"
-        if re_or(title, "^Historias de nuestro cine", flags=re.I) and year == 2019:
-            return "tt11128736"
-        if re_or(title, "^Mujeres sin censura", flags=re.I) and year == 2021:
-            return "tt15787982"
-        if re_or(title, "^Para profesor vale cualquiera", flags=re.I) and year == 2022:
-            return "tt18718108"
-        if re_or(title, r"^\¡Upsss 2\! \¿Y ahora dónde está Noé", flags=re.I):
-            return "tt12615474"
-        if re_or(title, r"^El asombroso Mauricio", flags=re.I) and year == 2022:
-            return "tt10473036"
-        if re_or(title, r"^Mi pequeño amor", flags=re.I) and year == 2020:
-            return "tt12546872"
-        if re_or(title, r"^Un cuento de Navidad", flags=re.I) and year == 2008:
-            return "tt0993789"
-        if re_or(title, r"^Hanna y los monstruos", flags=re.I) and year == 2022:
-            return "tt2903136"
-        if re_or(title, r"^La buena vida", flags=re.I) and year == 2008:
-            return "tt1327798"
-        if re_or(title, r"^Alguien que cuide de mí", flags=re.I) and year == 2023:
-            return "tt19382276"
-        if re_or(title, r"^Bardem, la metamorfosis", flags=re.I) and year in (2023, 2020):
-            return "tt31647570"
-        if re_or(title, r"^Indomable, Ava Gardner", flags=re.I) and year in (2018, 2016):
-            return "tt8610760"
-        if re_or(title, r"^Los ángeles exterminados", flags=re.I) and year == 1968:
-            return "tt37384074"
-        if re_or(title, r"^El traje", flags=re.I) and year == 2002:
-            return "tt0340407"
-        if re_or(title, r"^Corazón roto. Fuga a Italia", flags=re.I) and year == 2023:
-            return "tt33992356"
-        if re_or(title, r"^5\.?669 días", flags=re.I) and year == 2024:
-            return "tt35091016"
 
 
 IMDB = IMDBApi()

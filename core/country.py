@@ -62,3 +62,12 @@ def to_country(s: str):
         eng=s,
         ico=c.flag
     )
+
+
+def to_alpha_3(s: str):
+    if s == "West Germany":
+        return to_alpha_3("Germany")
+    c = search_country(name=s)
+    if c is None:
+        raise ValueError(f"País no encontrado: {s}")
+    return c.alpha_3.upper()

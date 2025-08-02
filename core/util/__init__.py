@@ -11,6 +11,7 @@ import pytz
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 from collections import Counter
+from os import environ
 
 import uuid
 
@@ -554,3 +555,13 @@ def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = Non
                 obj = None
         return obj
     return obj
+
+
+def get_env(*args: str, default: str = None) -> str | None:
+    for a in args:
+        v = environ.get(a)
+        if isinstance(v, str):
+            v = v.strip()
+            if len(v):
+                return v
+    return default

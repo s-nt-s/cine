@@ -7,12 +7,8 @@ from typing import Any
 from bs4 import Tag
 import logging
 from core.cache import Cache
-from core.util import dict_walk, trim, re_or, mapdict, tp_split, to_int_float, dict_walk_positive
-from core.film import Film, IMDb
-from core.imdb import IMDB, IMDBInfo
+from core.util import dict_walk, trim, re_or, mapdict, tp_split, dict_walk_positive
 import re
-from core.wiki import WIKI
-from core.country import to_country
 from functools import cache
 from typing import NamedTuple
 from core.filemanager import FM, DictFile
@@ -162,7 +158,7 @@ class Rtve(Web):
     def get_videos(self, *urls: str):
         id_li: dict[int, Tag] = dict()
         ids: set[int] = set()
-        arr: set[Video] = set()
+        col: dict[id, set[Video]] = defaultdict(set)
         set_urls = set(urls)
         js_urls = set_urls.intersection(Rtve.JSONS)
         ids = ids.union(self.__get_ids(*js_urls))
@@ -185,11 +181,41 @@ class Rtve(Web):
                 ficha = self.get_ficha(ficha_id)
                 v = self.__ficha_to_video(ficha, id_li.get(ficha_id))
                 if v is not None:
-                    arr.add(v)
+                    col[v.id].add(v)
+        arr: set[Video] = set()
+        for v in col.values():
+            arr.add(self.__merge(v))
         videos = tuple(sorted(arr, key=lambda r: r.id))
         self.__cache.dump()
         self.__log.dump()
         return videos
+
+    def __merge(videos: set[Video]):
+        if len(videos) == 0:
+            raise ValueError(videos)
+        if len(videos) == 1:
+            return videos.pop()
+        v1 = videos.pop()._asdict()
+        while videos:
+            for k, new in videos.pop()._asdict().items():
+                if new in (None, tuple(), ''):
+                    continue
+                old = v1[k]
+                if old in (None, tuple(), ''):
+                    v1[k] = new
+                    continue
+                if isinstance(old, (int, float)) and isinstance(new, (int, float)) and old < new:
+                    v1[k] = new
+                    continue
+                if type(old) is not type(new):
+                    continue
+                if isinstance(old, tuple):
+                    old = list(old)
+                    for x in new:
+                        if x not in old:
+                            old.append(x)
+                    v1[k] = tuple(old)
+        return Video(**v1)
 
     def __ficha_to_video(self, ficha: dict, li: Tag = None):
         idAsset = dict_walk(ficha, 'id', instanceof=(int, type(None)))
@@ -230,6 +256,8 @@ class Rtve(Web):
             genres=self.__get_genres_from_ficha(ficha),
             description=self.__get_description(url, ficha),
         )
+        if self.__is_ko(v):
+            return None
         if v.idImdb is None:
             v = v._replace(
                 idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director)
@@ -290,77 +318,15 @@ class Rtve(Web):
             img_others,
         )))
 
-    def get_films(self, *urls: str) -> tuple[Film, ...]:
-        videos = list(self.get_videos(*urls))
-
-        def __filter(_get_imdb_info):
-            for i, v in reversed(list(enumerate(videos))):
-                is_ko = self.__is_ko(v, _get_imdb_info(v.idImdb))
-                if is_ko:
-                    logger.warning(f"{v.id} {v.title} descartado por "+is_ko)
-                    del videos[i]
-
-        logger.info("Filtro imdb=None")
-        __filter(lambda x: None)
-        logger.info("Filtro imdb = <completeWithImdb=False, completeWithWiki=False>")
-        __filter(lambda x: IMDB.get(x, completeWithImdb=False, completeWithWiki=False))
-        logger.info("Filtro imdb = <completeWithImdb=True, completeWithWiki=False>")
-        __filter(lambda x: IMDB.get(x, completeWithImdb=True, completeWithWiki=False))
-        logger.info("Filtro imdb = <completeWithImdb=True, completeWithWiki=True>")
-        __filter(lambda x: IMDB.get(x, completeWithImdb=True, completeWithWiki=True))
-        logger.info(f"Resultado filtro {len(videos)}")
-
-        films: set[Film] = set()
-        for v in videos:
-            imdb_info = IMDB.get(v.idImdb)
-            f = Film(
-                source="rtve",
-                id=v.id,
-                title=v.title,
-                url=v.url,
-                img=self.__get_img(v, imdb_info),
-                program=v.programTitle,
-                lang=(v.language, ) if v.language else tuple(),
-                description=v.description,
-                year=v.productionDate or imdb_info.year,
-                expiration=v.expirationDate,
-                publication=v.publicationDate,
-                duration=v.duration,
-                director=v.director or imdb_info.director or tuple(),
-                casting=v.casting or imdb_info.actor or tuple(),
-                genres=self.__get_genres(v, imdb_info) or tuple(),
-                imdb=IMDb(
-                    id=v.idImdb,
-                    rate=to_int_float(v.imdbRate or imdb_info.rating),
-                    votes=imdb_info.votes if imdb_info else None
-                ) if v.idImdb else None,
-                wiki=WIKI.parse_url(imdb_info.wiki or v.idWiki),	
-                country=tuple(set(map(to_country, imdb_info.countries))),
-                filmaffinity=imdb_info.filmaffinity
-            )
-            films.add(f)
-        return tuple(films)
-
-    def __is_ko(self, v: Video, info_imdb: IMDBInfo):
-        if info_imdb is None:
-            info_imdb = IMDBInfo(id=None)
+    def __is_ko(self, v: Video):
         if v.typeName in ('Avance', 'Fragmento'):
             return f"type={v.typeName} subType={v.subTypeName}"
         if self.__is_ko_mainTopic(v.mainTopic):
             return f"mainTopic={v.mainTopic}"
-        genres = self.__get_genres(v, None)
-        if "Playz joven" in genres:
-            return f"genero={', '.join(genres)}"
+        if "Playz joven" in v.genres:
+            return f"genero={', '.join(v.genres)}"
         if v.programType in ("Entrevistas", ):
             return f"programType={v.programType}"
-        if info_imdb.awards is None and 'Spain' not in info_imdb.countries and "Documental" not in genres:
-            if info_imdb.typ in ("tvmovie", "episode", "series"):
-                return "Type="+info_imdb.typ
-            if "TV Movies" in genres:
-                return "Genero=TV Movies"
-        for t in (info_imdb.title, v.title):
-            if re_or(t, r"^Ein Sommer (an|auf)", r"^Corazón roto\. ", flags=re.I):
-                return "Title="+t
         return None
 
     def __is_ko_mainTopic(self, mainTopic: str):
@@ -371,62 +337,6 @@ class Rtve(Web):
         if mainTopic.startswith('PLAYZ/Series/'):
             return True
         return False
-
-    def __get_img(self, v: Video, imdb_info: IMDBInfo) -> str:
-        if v.img_vertical:
-            return v.img_vertical[0]
-        if imdb_info and imdb_info.img:
-            return imdb_info.img
-        if v.img_horizontal:
-            return v.img_horizontal[0]
-        if v.img_others:
-            return v.img_others[0]
-
-    def __get_genres(self, v: Video, imdb_info: IMDBInfo):
-        if imdb_info is None:
-            imdb_info = IMDBInfo(id=None)
-        if re_or(v.longTitle, r"^Cine [iI]nfantil"):
-            return ("Infantil", )
-        if re_or(v.longTitle, r"^Somos [dD]documentales"):
-            return ("Documental", )
-        if re_or(v.mainTopic, r"[Pp]el[íi]culas [Dd]ocumentales"):
-            return ("Documental", )
-        if re_or(v.mainTopic, r"[Cc]omedia negra"):
-            return ("Comedia", )
-        #if re_or(ecort_content, r"[Nn]o [Ff]icci[oó]n[\-\-\s]*[Ii]nformaci[óo]n"):
-        #    return ("Documental", )
-        if re_or(v.programType, r"[dD]ocumental"):
-            return ("Documental", )
-        if re_or(v.mainTopic, r"Thriller"):
-            return ("Suspense", )
-        if re_or(v.ecortContent, r"Thriller"):
-            return ("Suspense", )
-        if "Biography" in imdb_info.genres:
-            return ("Biográfico", )
-        if "Thriller" in imdb_info.genres:
-            return ("Suspense", )
-        if len(set(("Crime", "Mystery")).difference(imdb_info.genres)) == 0:
-            return ("Suspense", )
-        if "Horror" in imdb_info.genres:
-            return ("Terror", )
-        genres: set[str] = set()
-        for g in v.genres:
-            if g in (None, "Cine", "Cultura"):
-                continue
-            g = {
-                "Documentales": "Documental",
-                "Biografías": "Biográfico",
-                "Música": "Musical",
-                "Policíaca y suspense": "Suspense",
-                "Acción y aventuras": "Aventuras",
-                "Historia": "Histórico"
-            }.get(g, g)
-            genres.add(g)
-        if len(genres):
-            return tuple(genres)
-        if re_or(v.ecortContent, "[dD]rama"):
-            return ("Drama", )
-        return imdb_info.genres
 
     def __get_description(self, url: str, ficha: dict):
         arr = [i for i in map(
@@ -451,39 +361,6 @@ class Rtve(Web):
                 n.extract()
         return str(soup)
 
-    @cached_property
-    def films(self):
-        dct_films: dict[Film, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-        for f in self.get_films(*self.urls):
-            k = f._replace(
-                img=None,
-                program=None
-            )
-            for field in ("img", "program"):
-                val = f._asdict()[field]
-                if val is not None:
-                    dct_films[k][field].add(val)
-        films: set[Film] = set()
-        for f, set_values in dct_films.items():
-            for k, v in set_values.items():
-                if k == "img":
-                    best = [i for i in v if "/?h=" in i]
-                    if len(best) > 0:
-                        v = best
-                v = tuple(sorted(v))
-                if len(v) > 1:
-                    logger.warning(f"{f.id} {f.title} {f.url} tiene varios {k} = {v}")
-                if len(v) > 0:
-                    if k == "img":
-                        img = v[0]
-                        if img.endswith("?h=400"):
-                            img = img.rsplit("?", 1)[0]+"?w=150"
-                        f = f._replace(**{k: img})
-                    else:
-                        f = f._replace(**{k: ", ".join(v)})
-            films.add(f)
-        return tuple(sorted(films, key=lambda x: (x.title, x.id)))
-
     @Cache("rec/rtve/ficha/{}.json")
     def get_ficha(self, id: int) -> dict[str, Any]:
         js = self.json(f"https://api.rtve.es/api/videos/{id}.json")
@@ -491,7 +368,5 @@ class Rtve(Web):
 
 
 if __name__ == "__main__":
-    from core.filemanager import FM
-    from glob import glob
     r = Rtve()
     v = r.get_videos(*r.urls)

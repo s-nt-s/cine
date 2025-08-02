@@ -46,3 +46,4 @@ class Film(NamedTuple):
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]
+

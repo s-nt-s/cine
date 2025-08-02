@@ -1,11 +1,18 @@
 
-from sqlite3 import OperationalError, connect
+from sqlite3 import OperationalError, connect, Cursor
 from atexit import register
 import logging
 from functools import cache
 from core.film import IMDb
 
 logger = logging.getLogger(__name__)
+
+
+def dict_factory(cursor: Cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
 
 
 def gW(tp: tuple):
@@ -42,7 +49,8 @@ class DBlite:
             )
         return self.__con
 
-    def select(self, sql: str, *args, **kwargs):
+    def select(self, sql: str, *args, row_factory=None, **kwargs):
+        self.con.row_factory = row_factory
         cursor = self.con.cursor()
         try:
             if len(args):
@@ -55,6 +63,7 @@ class DBlite:
         for r in cursor:
             yield r
         cursor.close()
+        self.con.row_factory = None
 
     def one(self, sql: str, *args, **kwargs):
         for r in self.select(sql, *args, **kwargs):
