@@ -189,7 +189,7 @@ class FileManager:
         if txt is None:
             return {}
         obj = {}
-        for tp in map(str.split(map(str.strip, re.split(r"\n+", txt.strip())))):
+        for tp in map(str.split, map(str.strip, re.split(r"\n+", txt.strip()))):
             if len(tp) != 2:
                 continue
             obj[int(tp[0])] = tp[1]
