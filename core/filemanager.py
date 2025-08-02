@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 from json.decoder import JSONDecodeError
 from dataclasses import is_dataclass, asdict
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,18 @@ class FileManager:
 
         return root_file
 
-    def normalize_ext(self, ext) -> str:
+    def __get_ext(self, file: Path) -> str:
         """
         Normaliza extensiones para identificar el tipo de fichero en base a la extension
         """
-        ext = ext.lstrip(".")
+        s_file = str(file).lower()
+        for k, v in {
+            ".dct.txt": "dct"
+        }.items():
+            if s_file.endswith(k):
+                return v
+            
+        ext = file.suffix.lstrip(".")
         ext = ext.lower()
         return {
             "xlsx": "xls",
@@ -89,7 +97,7 @@ class FileManager:
         """
         file = self.resolve_path(file)
 
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         load_fl = getattr(self, "load_"+ext, None)
         if load_fl is None:
@@ -110,7 +118,7 @@ class FileManager:
         file = self.resolve_path(file)
         makedirs(file.parent, exist_ok=True)
 
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         dump_fl = getattr(self, "dump_"+ext, None)
         if dump_fl is None:
@@ -131,7 +139,7 @@ class FileManager:
             Indica si se debe sobreescribir en caso de ya existir
         """
         file = self.resolve_path(file)
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         if overwrite or not file.exists():
             r = requests.get(url, verify=verify, headers=headers)
@@ -172,6 +180,30 @@ class FileManager:
             txt = txt.format(*args, **kwargs)
         with open(file, "w") as f:
             f.write(txt)
+
+    def load_dct(self, file, *args, **kwargs):
+        file = self.resolve_path(file)
+        if not file.is_file():
+            return {}
+        txt = self.load_txt(file)
+        if txt is None:
+            return {}
+        obj = {}
+        for tp in map(str.split(map(str.strip, re.sub(r"\n+", txt.strip())))):
+            if len(tp) != 2:
+                continue
+            obj[int(tp[0])] = tp[1]
+        return obj
+
+    def dump_dct(self, file, obj, *args, **kwargs):
+        if not isinstance(obj, dict):
+            return
+        lns = []
+        for k, v in sorted(obj.items()):
+            if v is not None:
+                lns.append(f"{k} {v}")
+        txt = "\n".join(lns)
+        self.dump_txt(file, txt)
 
     def __parse(self, obj):
         if getattr(obj, "_asdict", None) is not None:

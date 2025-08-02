@@ -12,6 +12,8 @@ from core.film import Film
 from core.country import to_country
 import re
 from core.dblite import DB
+from core.filemanager import FM
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +47,7 @@ class Video(NamedTuple):
     genres: tuple[str, ...]
     description: str
     covers: tuple[str, ...]
-    director_name: str
+    director: tuple[str, ...]
     banner_main: str
     banner_trailer: str
     provider_slug: str
@@ -56,6 +58,7 @@ class Video(NamedTuple):
     countries: tuple[str, ...]
     created: str
     expire: str
+    imdb: str | None
 
     @staticmethod
     def mk_url(id: int, slug: str):
@@ -84,6 +87,8 @@ def _g_date(dt: str):
 
 class EFilm:
     def __init__(self, origin: str, min_duration=50):
+        self.__cache_file = "cache/efilm.dct.txt"
+        self.__cache: dict[int, str] = FM.load(self.__cache_file)
         self.__s = requests.Session()
         self.__min_duration = min_duration
         self.__origin = origin
@@ -203,7 +208,7 @@ class EFilm:
                 genres=tuple(x['name'] for x in (i.get('genres') or [])),
                 description=i.get('description'),
                 covers=tuple(x['cover'] for x in (i.get('covers') or [])),
-                director_name=i.get('director_name'),
+                director=tp_split("/", i.get('director_name')),
                 banner_main=i.get('banner_main'),
                 banner_trailer=i.get('banner_trailer'),
                 provider_slug=i.get('provider_slug'),
@@ -213,12 +218,19 @@ class EFilm:
                 subtitle=_to_tuple(*subt, exclude=('mis', )),
                 countries=_to_tuple(*coun),
                 created=ficha.get('created'),
-                expire=ficha.get('expire')
+                expire=ficha.get('expire'),
+                imdb=self.__cache.get(i['id'])
             )
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
+            if v.imdb is None:
+                imdb = DB.search_imdb_id(v.name, v.year, v.director)
+                if imdb:
+                    v = v._replace(imdb=imdb)
+                    self.__cache[v.id] = imdb
             arr.add(v)
+        FM.dump(self.__cache_file, self.__cache)
         return tuple(sorted(arr, key=lambda v: v.id))
 
     @cached_property
@@ -238,17 +250,13 @@ class EFilm:
                 expiration=_g_date(v.expire),
                 publication=_g_date(v.created),
                 duration=v.duration,
-                imdb=None,
+                imdb=DB.get_imdb_info(v.imdb),
                 wiki=None,
                 filmaffinity=None,
-                director=tp_split("/", v.director_name),
+                director=v.director,
                 casting=v.actors,
                 genres=v.genres,
                 program=None
-            )
-            imdb = DB.search_imdb_id(v.title, v.year, v.director)
-            v._replace(
-                imdb=DB.get_imdb_info(imdb)
             )
             arr.add(v)
         return tuple(sorted(arr, key=lambda x: x.id))
