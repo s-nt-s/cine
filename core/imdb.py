@@ -62,6 +62,7 @@ class IMDBInfo(NamedTuple):
     genres: Optional[tuple[str, ...]] = tuple()
     img: Optional[str] = None
     filmaffinity: Optional[int] = None
+    duration: Optional[int] = None
 
 
 class IMDBApi:
@@ -105,6 +106,7 @@ class IMDBApi:
                 year=row['year'],
                 countries=tp_split(" ", row['countries']),
                 wiki=row['wikipedia'],
+                duration=row['duration'],
                 awards=None,
                 typ=row['type'],
                 genres=None,

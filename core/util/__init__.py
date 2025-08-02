@@ -565,3 +565,20 @@ def get_env(*args: str, default: str = None) -> str | None:
             if len(v):
                 return v
     return default
+
+
+def get_first(*args):
+    for a in args:
+        if a is not None:
+            return a
+
+
+def iter_chunk(size: int, args: list):
+    arr = []
+    for a in args:
+        arr.append(a)
+        if len(arr) == size:
+            yield arr
+            arr = []
+    if arr:
+        yield arr

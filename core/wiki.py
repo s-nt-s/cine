@@ -1,6 +1,6 @@
 from textwrap import dedent
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 from functools import cache
 import re
 from time import sleep
@@ -17,6 +17,29 @@ from urllib.error import HTTPError
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
 LANGS = ('es', 'en', 'ca', 'gl', 'it', 'fr')
+
+
+class WikiUrl(NamedTuple):
+    url: str
+    lang_code: str
+    lang_label: str
+
+    def to_html(self) -> str:
+        cls = ["wiki"]
+        title = "Wikipedia"
+        if self.lang_label:
+            title += f" en {self.lang_label}"
+        elif self.lang_code:
+            title += f" ({self.lang_code})"
+        if self.lang_code:
+            cls.append("wiki_"+self.lang_code)
+        cls_str = ' '.join(cls)
+        html = f'<a class="{cls_str}" href="{self.url}" title="{title}"'
+        if self.lang_code:
+            html += f' hreflang="{self.lang_code}"'
+        html += '>W</a>'
+        return html
+
 
 
 class WikiError(Exception):
@@ -374,22 +397,34 @@ class WikiApi:
         obj = {k: v.pop() for k, v in obj.items() if len(v) == 1}
         return obj
 
+    @cache
+    def get_label(self, field: str, value: str, lang: str) -> str | None:
+        arr = []
+        arr.append("SELECT ?fieldLabel WHERE {")
+        arr.append("{")
+        arr.append(f'   ?field {field} "{value}".')
+        arr.append("}")
+        arr.append('SERVICE wikibase:label { bd:serviceParam wikibase:language "%s". }' % lang)
+        arr.append("}")
+        arr.append("LIMIT 1")
+        query = "\n".join(arr)
+        dt = self.query(query)
+        if isinstance(dt, list):
+            obj = dt[0]
+            if isinstance(obj, dict):
+                obj = obj.get('fieldLabel')
+                if isinstance(obj, dict):
+                    return obj.get('value')
+
+    def parse_url(self, url: str):
+        if url is None:
+            return None
+        lang = url.split("://", 1)[-1].split(".", 1)[0]
+        label = self.get_label("wdt:P424", lang, "es,en")
+        return WikiUrl(
+            url=url,
+            lang_code=lang,
+            lang_label=label
+        )
 
 WIKI = WikiApi()
-
-if __name__ == "__main__":
-    import sys
-    from core.config_log import config_log
-    config_log("log/wiki.log")
-
-    if len(sys.argv) == 1:
-        from core.dblite import DBlite
-        db = DBlite("imdb.sqlite", quick_release=True)
-        ids = db.to_tuple("select id from movie limit 3000")
-        ok = WIKI.get_countries(*ids)
-        print(len(ok))
-        sys.exit()
-
-    result = WIKI.get_names(*sys.argv[1:])
-    for k, v in result.items():
-        print(k, v)

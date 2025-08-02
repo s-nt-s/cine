@@ -10,6 +10,7 @@ from core.film import Film
 from core.filemanager import FM
 import re
 from datetime import date
+from core.collector import get_films
 
 
 config_log("log/build_site.log")
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 NOW = datetime.now()
 
-films = tuple(Rtve().films)
+films = tuple(get_films())
 films = tuple(sorted(films, key=lambda f: f.publication, reverse=True))
 
 print("Películas:", len(films))
