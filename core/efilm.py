@@ -12,7 +12,7 @@ from core.film import Film
 from core.country import to_country
 import re
 from core.dblite import DB
-from core.filemanager import FM
+from core.filemanager import FM, DictFile
 
 
 logger = logging.getLogger(__name__)
@@ -87,8 +87,7 @@ def _g_date(dt: str):
 
 class EFilm:
     def __init__(self, origin: str, min_duration=50):
-        self.__cache_file = "cache/efilm.dct.txt"
-        self.__cache: dict[int, str] = FM.load(self.__cache_file)
+        self.__cache = DictFile("cache/efilm.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
         self.__origin = origin
@@ -228,9 +227,9 @@ class EFilm:
                 imdb = DB.search_imdb_id(v.name, v.year, v.director)
                 if imdb:
                     v = v._replace(imdb=imdb)
-                    self.__cache[v.id] = imdb
+                    self.__cache.set(v.id, imdb)
             arr.add(v)
-        FM.dump(self.__cache_file, self.__cache)
+        self.__cache.dump()
         return tuple(sorted(arr, key=lambda v: v.id))
 
     @cached_property

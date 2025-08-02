@@ -15,7 +15,7 @@ from core.wiki import WIKI
 from core.country import to_country
 from functools import cache
 from typing import NamedTuple
-from core.filemanager import FM
+from core.filemanager import FM, DictFile
 from core.dblite import DB
 
 
@@ -99,7 +99,7 @@ class Video(NamedTuple):
     casting: tuple[str, ...]
     genres: tuple[str, ...]
     productionDate: int
-    idImdb: str
+    idImdb: str | None
     imdbRate: float
     duration: int
     url: str
@@ -128,8 +128,8 @@ class Rtve(Web):
     )
 
     def __init__(self, *args, **kwargv):
-        self.__cache_file = "cache/rtve.dct.txt"
-        self.__cache: dict[int, str] = FM.load(self.__cache_file)
+        self.__cache = DictFile("cache/rtve.dct.txt")
+        self.__log = DictFile("cache/rtve.log.dct.txt")
         super().__init__(*args, **kwargv)
 
     @cached_property
@@ -183,24 +183,21 @@ class Rtve(Web):
         for ficha_id in sorted(ids):
             if ficha_id not in ids_ko:
                 ficha = self.get_ficha(ficha_id)
-                arr.add(self.__ficha_to_video(ficha, id_li.get(ficha_id)))
+                v = self.__ficha_to_video(ficha, id_li.get(ficha_id))
+                if v is not None:
+                    arr.add(v)
         videos = tuple(sorted(arr, key=lambda r: r.id))
-        FM.dump(self.__cache_file, self.__cache)
+        self.__cache.dump()
+        self.__log.dump()
         return videos
 
     def __ficha_to_video(self, ficha: dict, li: Tag = None):
         idAsset = dict_walk(ficha, 'id', instanceof=(int, type(None)))
-        productionDate = dict_walk(ficha, 'productionDate', instanceof=(int, type(None)))
-        title = clean_title(dict_walk(ficha, 'title', instanceof=str))
-        director = tuple(dict_walk(ficha, 'director', instanceof=(list, type(None))) or []),
+        ficha_idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
+        self.__log.set(idAsset, ficha_idImdb)
 
         img_vertical, img_horizontal, img_others = self.__get_imgs_from_ficha(ficha, li)
-        idImdb = self.__cache.get(idAsset)
-        if idImdb is None:
-            idImdb = DB.search_imdb_id(title, productionDate, director)
-            if idImdb is not None:
-                self.__cache[idAsset] = idImdb
-                idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
+
         url = dict_walk(ficha, 'htmlUrl', instanceof=str)
         duration = dict_walk(ficha, 'duration', instanceof=(int, type(None)))
         if duration is not None:
@@ -209,15 +206,15 @@ class Rtve(Web):
         v = Video(
             id=idAsset,
             url=url,
-            title=title,
+            title=clean_title(dict_walk(ficha, 'title', instanceof=str)),
             img_vertical=img_vertical,
             img_horizontal=img_horizontal,
             img_others=img_others,
-            productionDate=productionDate,
-            idImdb=idImdb,
+            productionDate=dict_walk(ficha, 'productionDate', instanceof=(int, type(None))),
+            idImdb=self.__cache.get(idAsset, ficha_idImdb),
             typeName=dict_walk(ficha, 'type/name', instanceof=(str, type(None))),
             subTypeName=dict_walk(ficha, 'subType/name', instanceof=(str, type(None))),
-            director=director,
+            director=tuple(dict_walk(ficha, 'director', instanceof=(list, type(None))) or []),
             casting=tuple(dict_walk(ficha, 'casting', instanceof=(list, type(None))) or []),
             imdbRate=dict_walk_positive(ficha, 'imdbRate'),
             mainTopic=dict_walk(ficha, 'mainTopic', instanceof=str),
@@ -233,6 +230,11 @@ class Rtve(Web):
             genres=self.__get_genres_from_ficha(ficha),
             description=self.__get_description(url, ficha),
         )
+        if v.idImdb is None:
+            v = v._replace(
+                idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director)
+            )
+            self.__cache.set(idAsset, v.idImdb)
         return v
 
     def __get_genres_from_ficha(self, ficha: dict):

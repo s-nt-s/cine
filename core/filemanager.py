@@ -239,4 +239,21 @@ for mth in dir(FileManager):
                 mth.__doc__ = "Guarda "
             mth.__doc__ = mth.__doc__ + "un fichero de tipo "+ext
 
+
+class DictFile:
+    def __init__(self, file: str):
+        self.__file = file
+        self.__data: dict[int, str] = FM.load(file)
+
+    def dump(self):
+        FM.dump(self.__file, self.__data)
+
+    def get(self, k: int):
+        return self.__data.get(k)
+
+    def set(self, k: int, v: str):
+        if isinstance(v, str):
+            self.__data[k] = v
+
 FM = FileManager()
+
