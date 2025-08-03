@@ -2,7 +2,6 @@ from requests import Session
 from os import environ
 import logging
 from core.util import tp_split, mapdict, dict_walk, dict_walk_tuple, dict_walk_positive
-from core.cache import Cache
 from functools import cache
 import re
 from core.web import buildSoup, get_text, WEB, find_by_text
@@ -114,9 +113,15 @@ class IMDBApi:
                 filmaffinity=row['filmaffinity']
             )
         countries: dict[str, tuple] = dict()
-        for i in sorted(set(ids).difference(obj.keys())):
+        need_info = set(ids).difference(obj.keys())
+        for v in obj.values():
+            if not v.countries:
+                need_info.add(v.id)
+        for i in sorted(need_info):
             data = self.__get_basic(i)
-            countries[i] = tuple(map(to_alpha_3, dict_walk(data, 'Country', instanceof=(list, type(None)))))
+            countries[i] = to_alpha_3(dict_walk(data, 'Country', instanceof=(list, type(None))))
+            if i in obj:
+                continue
             obj[i] = IMDBInfo(
                 id=i,
                 title=dict_walk(data, 'Title', instanceof=(str, type(None))),
@@ -224,9 +229,9 @@ class IMDBApi:
             js["imdbRating"] = float(imdbRating.replace(",", "."))
             js["imdbVotes"] = int(imdbVotes.replace(",", ""))
         if find_by_text(soup, "a", "Todos los episodios"):
-            js['Type'] = 'episode'
+            js['Type'] = 'tvEpisode'
         if find_by_text(soup, "li", "Película de TV"):
-            js['Type'] = 'tvmovie'
+            js['Type'] = 'tvMovie'
 
         js = {k: v for k, v in js.items() if v is not None}
         if len(js) == 0:
@@ -243,4 +248,4 @@ IMDB = IMDBApi()
 if __name__ == "__main__":
     import sys
     r = IMDB.get(sys.argv[1])
-    print(r)
+    print(*r.values(), end="\n")

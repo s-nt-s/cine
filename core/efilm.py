@@ -158,14 +158,15 @@ class EFilm:
         gamma = (i.get('gamma') or {}).get('name_show')
         duration = i.get('duration', 999999)
         director_name = i.get('director_name')
+        year = i['year']
         if typ in ('game', ):
             arr.append(f'type={typ}')
         if gamma in ('Azul', ):
             arr.append(f'gamma={gamma}')
         if director_name in (None, ""):
             arr.append("director=None")
-        if duration < self.__min_duration:
-            arr.append(f'duration={duration}')
+        if year > 1960 and duration < self.__min_duration:
+            arr.append(f'year={year} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
         if provider in ('Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
@@ -225,7 +226,7 @@ class EFilm:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
             if v.imdb is None:
-                imdb = None  # DB.search_imdb_id(v.name, v.year, v.director)
+                imdb = DB.search_imdb_id(v.name, v.year, v.director)
                 if imdb:
                     v = v._replace(imdb=imdb)
                     self.__cache.set(v.id, imdb)
