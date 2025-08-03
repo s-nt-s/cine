@@ -149,20 +149,20 @@ class IMDBApi:
             obj[k] = obj[k]._replace(filmaffinity=v)
         for k, c2 in WIKI.get_countries(*need_countries).items():
             c1 = countries.get(i)
-            obj[k] = obj[k]._replace(countries=self.__merge(c1, c2))
+            obj[k] = obj[k]._replace(countries=self.__merge(c1, tp_split(" ", c2)))
         for k, c1 in countries.items():
             if not obj[k].countries:
                 obj[k] = obj[k]._replace(countries=c1)
         return obj
 
-    def __merge(self, countries1: list[str], countries2: list[str]):
+    def __merge(self, countries1: tuple[str, ...], countries2: tuple[str, ...]):
         if not countries1:
-            return countries2 or list()
+            return countries2 or tuple()
         if not countries2:
-            return countries1 or list()
-        merge = list(set(countries1).intersection(countries2))
+            return countries1 or tuple()
+        merge = tuple(set(countries1).intersection(countries2))
         if not merge:
-            return countries2 or list()
+            return countries2 or tuple()
         return merge
 
     @cache

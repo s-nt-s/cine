@@ -87,7 +87,7 @@ def retry_fetch(chunk_size=5000):
             tries = 0
             until = datetime.now() + timedelta(seconds=60*5)
             cur_chunk_size = int(chunk_size)
-            while tries == 0 or (datetime.now() < until and tries < 3):
+            while ko and (tries == 0 or (datetime.now() < until and tries < 3)):
                 error_query = {}
                 tries = tries + 1
                 if tries > 1:
