@@ -313,7 +313,7 @@ class WikiApi:
         return r
 
     @cache
-    @retry_fetch(chunk_size=1000)
+    @retry_fetch(chunk_size=500)
     def get_countries(self, *args: str) -> dict[str, str]:
         r = defaultdict(set)
         ids = " ".join(f'"{x}"' for x in args)
