@@ -248,12 +248,13 @@ class DictFile:
     def dump(self):
         FM.dump(self.__file, self.__data)
 
-    def get(self, k: int):
-        return self.__data.get(k)
+    def get(self, k: int, default=None):
+        return self.__data.get(k, default)
 
     def set(self, k: int, v: str):
         if isinstance(v, str):
             self.__data[k] = v
+
 
 FM = FileManager()
 

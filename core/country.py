@@ -45,7 +45,7 @@ def search_country(name):
     return None
 
 
-def to_country(s: str):
+def to_country(s: str) -> Country:
     if s == "West Germany":
         return to_country("Germany")._replace(
             eng=s,
@@ -71,3 +71,17 @@ def to_alpha_3(s: str):
     if c is None:
         raise ValueError(f"País no encontrado: {s}")
     return c.alpha_3.upper()
+
+
+def to_countries(cs: tuple[str, ...]):
+    if not isinstance(cs, tuple):
+        return tuple()
+    arr: list[Country] = []
+    for c in cs:
+        try:
+            x = to_country(c)
+            if x:
+                arr.append(x)
+        except ValueError as e:
+            logger.critical(str(e))
+    return tuple(arr)

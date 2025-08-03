@@ -427,4 +427,5 @@ class WikiApi:
             lang_label=label
         )
 
+
 WIKI = WikiApi()

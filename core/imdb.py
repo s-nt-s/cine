@@ -109,7 +109,7 @@ class IMDBApi:
                 duration=row['duration'],
                 awards=None,
                 typ=row['type'],
-                genres=None,
+                genres=tuple(),
                 img=None,
                 filmaffinity=row['filmaffinity']
             )
@@ -154,7 +154,6 @@ class IMDBApi:
             if not obj[k].countries:
                 obj[k] = obj[k]._replace(countries=c1)
         return obj
-
 
     def __merge(self, countries1: list[str], countries2: list[str]):
         if not countries1:

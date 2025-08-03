@@ -156,6 +156,8 @@ class Rtve(Web):
 
     @cache
     def get_videos(self, *urls: str):
+        if len(urls) == 0:
+            urls = tuple(self.urls)
         id_li: dict[int, Tag] = dict()
         ids: set[int] = set()
         col: dict[id, set[Video]] = defaultdict(set)
@@ -188,9 +190,10 @@ class Rtve(Web):
         videos = tuple(sorted(arr, key=lambda r: r.id))
         self.__cache.dump()
         self.__log.dump()
+        logger.info(f"{len(videos)} recuperados de rtve")
         return videos
 
-    def __merge(videos: set[Video]):
+    def __merge(self, videos: set[Video]):
         if len(videos) == 0:
             raise ValueError(videos)
         if len(videos) == 1:

@@ -231,6 +231,7 @@ class EFilm:
                     self.__cache.set(v.id, imdb)
             arr.add(v)
         self.__cache.dump()
+        logger.info(f"{len(arr)} recuperados de efilm")
         return tuple(sorted(arr, key=lambda v: v.id))
 
 
