@@ -5,6 +5,9 @@ from core.film import Film, IMDb
 from core.wiki import WIKI
 from core.util import re_or, get_first
 from core.country import to_countries
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_imdb(*args: RtveVideo | EFilmVideo):
@@ -19,10 +22,24 @@ def get_imdb(*args: RtveVideo | EFilmVideo):
 
 def get_films():
     arr: list[Film] = []
+    for imdb, v in iter_films():
+        if not isinstance(v.imdb, IMDb) or not isinstance(v.imdb.id, str):
+            v = v._replace(imdb=None)
+        ko = is_ko(imdb)
+        if ko:
+            logger.debug(f"{v.url} descartado por {ko}")
+            continue
+        if v.imdb is None:
+            logger.debug(f"NO_IMDB {v.url}")
+        arr.append(v)
+    return tuple(arr)
+
+
+def iter_films():
     rtve = Rtve().get_videos()
     eflim = EFilm(
         origin='https://cinemadrid.efilm.online',
-        min_duration=0
+        min_duration=50
     ).get_videos()
     info_imdb = IMDB.get(*get_imdb(*rtve, *eflim))
     for v in rtve:
@@ -30,12 +47,15 @@ def get_films():
             id=v.idImdb,
             rate=v.imdbRate
         )
-        arr.append(Film(
+        img = get_rtve_img(v, imdb)
+        if img:
+            img.replace("?h=400", "?w=150")
+        yield imdb, Film(
             source="rtve",
             id=v.id,
             url=v.url,
             title=v.title,
-            img=get_rtve_img(v, imdb),
+            img=img,
             lang=None,
             country=to_countries(imdb.countries),
             description=v.description,
@@ -53,13 +73,12 @@ def get_films():
             director=v.director,
             casting=v.casting,
             genres=get_rtve_genres(v, imdb)
-        ))
+        )
     for v in eflim:
         imdb = info_imdb.get(v.imdb) or IMDBInfo(
             id=v.imdb,
         )
-        v.countries
-        arr.append(Film(
+        yield imdb, Film(
             source="efilm",
             id=v.id,
             url=v.get_url(),
@@ -82,18 +101,19 @@ def get_films():
             director=v.director,
             casting=v.actors,
             genres=v.genres
-        ))
-    return tuple(arr)
+        )
 
 
 def is_ko(i: IMDBInfo):
-    if not isinstance(i, IMDBInfo):
+    if i is None:
         return None
+    if not isinstance(i, IMDBInfo):
+        raise ValueError(i)
     if i.typ in ('tvEpisode', 'tvSeries', 'tvMiniSeries'):
         return f"imdb_type={i.typ}"
     if not i.awards and i.countries and "ESP" not in i.countries:
         if i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
-            return f"imdb_type={i.typ}" 
+            return f"imdb_type={i.typ}"
 
 
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:

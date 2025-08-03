@@ -44,7 +44,7 @@
     </p>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="{{f.source}}{{f.id}}">
+      <div class="film {{f.source}}" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
         <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
           <p class="botonera">

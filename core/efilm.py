@@ -225,7 +225,7 @@ class EFilm:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
             if v.imdb is None:
-                imdb = DB.search_imdb_id(v.name, v.year, v.director)
+                imdb = None  # DB.search_imdb_id(v.name, v.year, v.director)
                 if imdb:
                     v = v._replace(imdb=imdb)
                     self.__cache.set(v.id, imdb)

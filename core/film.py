@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from core.wiki import WikiUrl
 
 
@@ -39,10 +39,9 @@ class Film(NamedTuple):
     expiration: str
     publication: str
     duration: int
-    imdb: IMDb
     wiki: WikiUrl
     filmaffinity: str | None
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]
-
+    imdb: Optional[IMDb] = None
