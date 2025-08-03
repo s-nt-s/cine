@@ -69,6 +69,7 @@ class IMDBApi:
         key = environ['OMDBAPI_KEY']
         self.__omdbapi = f"http://www.omdbapi.com/?apikey={key}&i="
         self.__imdb = "https://www.imdb.com/es-es/title/"
+        self.__omdbapi_activate = True
         self.__s = Session()
 
     @cache
@@ -172,7 +173,7 @@ class IMDBApi:
 
     @cache
     def __get_basic(self, id: str):
-        if id in (None, ""):
+        if self.__omdbapi_activate is False or id in (None, ""):
             return None
         if not isinstance(id, str):
             raise ValueError(id)
@@ -182,6 +183,8 @@ class IMDBApi:
         response = js.get("Response")
         if isError:
             logger.warning(f"IMDBApi: {id} = {js['Error']}")
+            if js['Error'] == "Request limit reached!":
+                self.__omdbapi_activate = False
         elif response is not True:
             logger.warning(f"IMDBApi: {id} Response = {response}")
         if self.__need_info(js):
