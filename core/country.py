@@ -51,7 +51,8 @@ def search_country(name: str):
         "russia": "Russian Federation",
         "turkey": "Türkiye",
         "uk": "GB",
-        "yugoslavia": "Yugoslavia, (Socialist) Federal Republic of"
+        "yugoslavia": "Yugoslavia, (Socialist) Federal Republic of",
+        "occupied palestinian territory": "PSE"
     }.get(lw_name)
     if alias:
         return search_country(alias)
