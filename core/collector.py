@@ -45,11 +45,14 @@ def iter_films():
     for v in rtve:
         imdb = info_imdb.get(v.idImdb) or IMDBInfo(
             id=v.idImdb,
-            rate=v.imdbRate
+            rating=v.imdbRate
         )
         img = get_rtve_img(v, imdb)
         if img:
             img.replace("?h=400", "?w=150")
+        imdbRate = None
+        if (imdb.rating, v.imdbRate) != (None, None):
+            imdbRate = max(imdb.rating or 0, v.imdbRate or 0)
         yield imdb, Film(
             source="rtve",
             id=v.id,
@@ -65,7 +68,7 @@ def iter_films():
             duration=v.duration or imdb.duration,
             imdb=IMDb(
                 id=imdb.id,
-                rate=max(imdb.rating, v.imdbRate or 0),
+                rate=imdbRate,
                 votes=imdb.votes
             ),
             wiki=WIKI.parse_url(imdb.wiki),

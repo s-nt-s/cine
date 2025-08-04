@@ -41,7 +41,6 @@ class WikiUrl(NamedTuple):
         return html
 
 
-
 class WikiError(Exception):
     def __init__(self, msg: str, query: str, http_code: int):
         super().__init__(f"{msg}\n{query}")
@@ -91,7 +90,7 @@ def retry_fetch(chunk_size=5000):
                 error_query = {}
                 tries = tries + 1
                 if tries > 1:
-                    cur_chunk_size = cur_chunk_size // 3
+                    cur_chunk_size = max(1, min(cur_chunk_size, len(ko)) // 3)
                     sleep(5)
                 logger.info(_log_line(ko, kwargs, cur_chunk_size))
                 for chunk in iter_chunk(cur_chunk_size, list(ko)):
@@ -204,7 +203,7 @@ class WikiApi:
         return obj
 
     @cache
-    @retry_fetch(chunk_size=5000)
+    @retry_fetch(chunk_size=300)
     def get_label_dict(self, *args, key_field: str = None, lang: tuple[str] = None) -> dict[str, list[str | int]]:
         if len(args) == 0:
             return {}
@@ -267,7 +266,7 @@ class WikiApi:
         return r
 
     @cache
-    @retry_fetch(chunk_size=5000)
+    @retry_fetch(chunk_size=300)
     def get_dict(self, *args, key_field: str = None, val_field: str = None, by_field: str = None) -> dict[str, list[str | int]]:
         if len(args) == 0:
             return {}
@@ -313,7 +312,7 @@ class WikiApi:
         return r
 
     @cache
-    @retry_fetch(chunk_size=500)
+    @retry_fetch(chunk_size=300)
     def get_countries(self, *args: str) -> dict[str, str]:
         r = defaultdict(set)
         ids = " ".join(f'"{x}"' for x in args)
@@ -337,7 +336,7 @@ class WikiApi:
         return obj
 
     @cache
-    @retry_fetch(chunk_size=5000)
+    @retry_fetch(chunk_size=300)
     def get_wiki_url(self, *args):
         if len(args) == 0:
             return {}

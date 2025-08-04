@@ -9,6 +9,8 @@ from core.wiki import WIKI
 from typing import NamedTuple, Optional
 from core.dblite import DB, dict_factory, gW
 from core.country import to_alpha_3
+from core.cache import DictCache
+from core.git import G
 
 
 logger = logging.getLogger(__name__)
@@ -73,9 +75,28 @@ class IMDBApi:
         self.__s = Session()
 
     @cache
-    def __get_from_omdbapi(self, id: str):
-        r = self.__s.get(self.__omdbapi+id)
-        js = r.json()
+    @DictCache(
+        "out/ombd/{}.json",
+        mirror=(
+            "https://s-nt-s.github.io/imdb-sql/ombd/",
+            f"{G.page}/ombd/"
+        ),
+        maxOld=90
+    )
+    def __get_from_omdbapi(self, id: str) -> dict | None:
+        if not self.__omdbapi_activate:
+            return None
+        js: dict = self.__s.get(self.__omdbapi+id).json()
+        isError = js.get("Error")
+        response = js.get("Response")
+        if isError:
+            logger.warning(f"IMDBApi: {id} = {js['Error']}")
+            if js['Error'] == "Request limit reached!":
+                self.__omdbapi_activate = False
+            return None
+        if response not in (True, 'True', 'true'):
+            logger.warning(f"IMDBApi: {id} Response = {response}")
+            return None
         return js
 
     def get(self, *ids: str):
@@ -178,19 +199,11 @@ class IMDBApi:
         if not isinstance(id, str):
             raise ValueError(id)
         js = self.__get_from_omdbapi(id)
+        if js is None:
+            return None
         js = mapdict(_clean_js, js, compact=True)
-        isError = js.get("Error")
-        response = js.get("Response")
-        if isError:
-            logger.warning(f"IMDBApi: {id} = {js['Error']}")
-            if js['Error'] == "Request limit reached!":
-                self.__omdbapi_activate = False
-        elif response is not True:
-            logger.warning(f"IMDBApi: {id} Response = {response}")
         if self.__need_info(js):
             soup_js = self.__get_from_imdb(id)
-            if isError:
-                return soup_js
             if soup_js is None:
                 return js
             for k, v in soup_js.items():

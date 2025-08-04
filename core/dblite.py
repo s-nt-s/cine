@@ -91,15 +91,13 @@ class DBlite:
         self.__con = None
 
     @cache
-    def __search_person(self, name: str, category: str = None) -> tuple[str, ...]:
+    def __search_person(self, name: str) -> tuple[str, ...]:
         if not isinstance(name, str):
             return tuple()
         name = name.strip().lower()
         if len(name) == 0:
             return tuple()
         sql = "select id from {t} where {w}"
-        if category:
-            sql = sql + f" and id in (select person from worker where category='{category}')"
         for t, w in (
             ('PERSON', "lower(name) = ? COLLATE NOCASE"),
             ('PERSON_FTS', "name MATCH ?"),
@@ -111,10 +109,10 @@ class DBlite:
                 return ids
         return tuple()
 
-    def search_person(self, *names: str, category: str = None):
+    def search_person(self, *names: str):
         p: set[str] = set()
         for n in names:
-            p = p.union(self.__search_person(n, category=category))
+            p = p.union(self.__search_person(n))
         return tuple(sorted(p))
 
     @cache
@@ -189,7 +187,7 @@ class DBlite:
             """, year, *tt)
         if len(id_title) == 1:
             return id_title[0]
-        directos = self.search_person(*(director or tuple()), category='director')
+        directos = self.search_person(*(director or tuple()))
         if len(directos) == 0:
             return None
         id_dir = self.to_tuple(f"""
@@ -199,9 +197,8 @@ class DBlite:
                 id in (
                       select movie
                       from
-                        worker
+                        director
                       where
-                        category = 'director' and
                         person {gW(directos)}
                 )
         """, year, *directos)

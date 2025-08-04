@@ -9,6 +9,7 @@ from io import TextIOWrapper
 import csv
 from http.client import HTTPResponse
 from time import sleep
+from json.decoder import JSONDecodeError
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,12 @@ class Req:
                 raise
         sleep(wait)
         return self.get_json(url, headers, data, wait_if_status=tuple())
+
+    def safe_get_json(self, *args, **kwargs):
+        try:
+            return self.get_json(*args, **kwargs)
+        except (HTTPError, URLError, UnicodeDecodeError, timeout, JSONDecodeError):
+            return None
 
     def iter_tsv(self, url: str):
         with urlopen(url) as r:
