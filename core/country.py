@@ -64,9 +64,9 @@ def to_country(s: str) -> Country:
             eng=s,
             spa="Alemania Occidental"
         )
-    if s in ("SUM", "Soviet Union", "Unión soviética", "URSS"):
+    if s in ("SUN", "Soviet Union", "Unión soviética", "URSS"):
         return Country(
-            cod="SUM",
+            cod="SUN",
             spa="Unión soviética",
             eng="Soviet Union",
             ico="🇨🇳"
@@ -87,8 +87,8 @@ def to_country(s: str) -> Country:
 def _to_alpha_3(s: str):
     if s in (None, '', 'N/A'):
         return None
-    if s in ("SUM", "Soviet Union", "Unión soviética", "URSS"):
-        return "SUM"
+    if s in ("SUN", "Soviet Union", "Unión soviética", "URSS"):
+        return "SUN"
     if s == "West Germany":
         return _to_alpha_3("Germany")
     c = search_country(name=s)
