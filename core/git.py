@@ -40,7 +40,7 @@ class Git:
         if not m:
             return None
         user, project = m.groups()
-        return f"https://github.io/{user}/{project}"
+        return f"https://{user}.github.io/{project}"
 
     def __run(self, *args):
         try:

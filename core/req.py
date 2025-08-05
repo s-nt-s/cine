@@ -61,10 +61,12 @@ class Req:
         sleep(wait)
         return self.get_json(url, headers, data, wait_if_status=tuple())
 
-    def safe_get_json(self, *args, **kwargs):
+    def safe_get_json(self, url, *args, **kwargs):
         try:
-            return self.get_json(*args, **kwargs)
-        except (HTTPError, URLError, UnicodeDecodeError, timeout, JSONDecodeError):
+            return self.get_json(url, *args, **kwargs)
+        except (HTTPError, URLError, UnicodeDecodeError, timeout, JSONDecodeError) as e:
+            if not isinstance(e, HTTPError) or e.code != 404:
+                logger.warning(f"{url} {str(e)}")
             return None
 
     def iter_tsv(self, url: str):

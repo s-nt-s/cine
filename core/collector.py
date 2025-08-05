@@ -38,18 +38,20 @@ def get_films():
 def complete_film(v: Film):
     if v is None:
         return v
-    if v.imdb is None:
+    if v.imdb is None or v.imdb.id is None:
         logger.debug(f"NO_IMDB {v.url}")
+        return v._replace(imdb=None)
+    if v.casting and v.director and v.genres:
         return v
-    if v.casting and v.director:
-        return v
-    x = IMDB.get_from_omdbapi(v.imdb)
+    x = IMDB.get_from_omdbapi(v.imdb.id)
     if not isinstance(x, dict):
         return v
     if not v.casting:
-        v = v._replace(casting=tuple(x['Actors']))
+        v = v._replace(casting=tuple(x.get('Actors', [])))
     if not v.director:
-        v = v._replace(director=tuple(x['Director']))
+        v = v._replace(director=tuple(x.get('Director', [])))
+    if not v.genres:
+        v = v._replace(genres=tuple(x.get('Genre', [])))
     return v
 
 

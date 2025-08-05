@@ -2,7 +2,8 @@ from typing import Any
 from core.cache import Cache
 from core.util import mapdict
 import requests
-from requests.exceptions import JSONDecodeError
+from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
+from json.decoder import JSONDecodeError as DecoderJSONDecodeError
 from typing import NamedTuple
 import logging
 import time
@@ -106,7 +107,7 @@ class EFilm:
                 continue
             try:
                 return r.json()
-            except JSONDecodeError:
+            except (DecoderJSONDecodeError, RequestsJSONDecodeError):
                 logger.critical(f"{r.status_code} {url}")
                 raise
 
