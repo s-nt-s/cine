@@ -31,12 +31,12 @@ class Git:
         if remote.endswith(".git"):
             remote = remote[:-4]
         if remote.startswith("git@"):
-            remote = remote.replace("git@", "https://").replace(":", "/")
+            remote = "https://" + remote.replace("git@", "").replace(":", "/")
         return remote.rstrip("/")
 
     @cached_property
     def page(self):
-        m = re.match(r"^https///github.com/(.*?)/(.*?)$", self.remote)
+        m = re.match(r"^https://github.com/(.*?)/(.*?)$", self.remote)
         if not m:
             return None
         user, project = m.groups()

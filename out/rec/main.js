@@ -239,7 +239,7 @@ function ifLocal() {
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
     if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href, 1)}.json`));
-    if (imdb) p.append(" ", mkA(`../rec/imdb/${gId(imdb.href, 1)}.json`));
+    if (imdb) p.append(" ", mkA(`../omdb/${gId(imdb.href, 1)}.json`));
   })
   document.querySelectorAll("div.film.eflim").forEach(i=>{
     const p = i.querySelector("p");

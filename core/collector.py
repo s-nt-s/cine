@@ -5,6 +5,7 @@ from core.film import Film, IMDb
 from core.wiki import WIKI
 from core.util import re_or, get_first
 from core.country import to_countries
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,17 +23,34 @@ def get_imdb(*args: RtveVideo | EFilmVideo):
 
 def get_films():
     arr: list[Film] = []
-    for imdb, v in iter_films():
+    for source, imdb, v in iter_films():
         if not isinstance(v.imdb, IMDb) or not isinstance(v.imdb.id, str):
             v = v._replace(imdb=None)
-        ko = is_ko(imdb)
+        ko = is_ko(source, imdb)
         if ko:
             logger.debug(f"{v.url} descartado por {ko}")
             continue
-        if v.imdb is None:
-            logger.debug(f"NO_IMDB {v.url}")
+        v = complete_film(v)
         arr.append(v)
     return tuple(arr)
+
+
+def complete_film(v: Film):
+    if v is None:
+        return v
+    if v.imdb is None:
+        logger.debug(f"NO_IMDB {v.url}")
+        return v
+    if v.casting and v.director:
+        return v
+    x = IMDB.get_from_omdbapi(v.imdb)
+    if not isinstance(x, dict):
+        return v
+    if not v.casting:
+        v = v._replace(casting=tuple(x['Actors']))
+    if not v.director:
+        v = v._replace(director=tuple(x['Director']))
+    return v
 
 
 def iter_films():
@@ -53,7 +71,7 @@ def iter_films():
         imdbRate = None
         if (imdb.rating, v.imdbRate) != (None, None):
             imdbRate = max(imdb.rating or 0, v.imdbRate or 0)
-        yield imdb, Film(
+        yield v, imdb, Film(
             source="rtve",
             id=v.id,
             url=v.url,
@@ -81,7 +99,7 @@ def iter_films():
         imdb = info_imdb.get(v.imdb) or IMDBInfo(
             id=v.imdb,
         )
-        yield imdb, Film(
+        yield v, imdb, Film(
             source="efilm",
             id=v.id,
             url=v.get_url(),
@@ -107,16 +125,20 @@ def iter_films():
         )
 
 
-def is_ko(i: IMDBInfo):
+def is_ko(source, i: IMDBInfo):
     if i is None:
         return None
     if not isinstance(i, IMDBInfo):
         raise ValueError(i)
+    banIfTv = False
+    if isinstance(source, RtveVideo):
+        banIfTv = re_or(source.longTitle, "Sesión de tarde", flags=re.I) and re_or(source.mainTopic, "Cine internacional", flags=re.I)
+    if not banIfTv:
+        banIfTv = not i.awards and i.countries and "ESP" not in i.countries
     if i.typ in ('tvEpisode', 'tvSeries', 'tvMiniSeries'):
         return f"imdb_type={i.typ}"
-    if not i.awards and i.countries and "ESP" not in i.countries:
-        if i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
-            return f"imdb_type={i.typ}"
+    if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
+        return f"imdb_type={i.typ}"
 
 
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:

@@ -146,12 +146,19 @@ class DictCache(Cache):
         elif isinstance(mirror, tuple):
             self.__mirror = mirror
 
-    def __find_in_mirror(self, name: str):
+    def __find_in_mirror(self, name: str) -> tuple[str, dict] | tuple[None, None]:
+        u, d = None, {}
         for m in self.__mirror:
             url = m + name
             data = R.safe_get_json(url)
             if isinstance(data, dict):
-                return url, data
+                data['__time__'] = to_timestamp(data.get('__time__'))
+                old_time = d.get('__time__')
+                new_time = data['__time__'] or -1
+                if old_time is None or (new_time > old_time):
+                    u, d = url, data
+        if u is not None:
+            return u, d
         return None, None
 
     def tooOld(self, fl: str):

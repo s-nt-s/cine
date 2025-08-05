@@ -140,7 +140,7 @@ class IMDBApi:
             if not v.countries:
                 need_info.add(v.id)
         for i in sorted(need_info):
-            data = self.__get_basic(i)
+            data = self.get_from_omdbapi(i)
             countries[i] = to_alpha_3(dict_walk(data, 'Country', instanceof=(list, type(None))))
             if i in obj:
                 continue
@@ -193,7 +193,7 @@ class IMDBApi:
         return merge
 
     @cache
-    def __get_basic(self, id: str):
+    def get_from_omdbapi(self, id: str):
         if self.__omdbapi_activate is False or id in (None, ""):
             return None
         if not isinstance(id, str):
