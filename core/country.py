@@ -3,7 +3,7 @@ import logging
 from typing import NamedTuple
 from pycountry.db import Country as DBCountry
 from pycountry import countries as DBCountries, historic_countries
-
+from core.util import get_first
 
 logger = logging.getLogger(__name__)
 LOCALE = Locale('es')
@@ -14,6 +14,7 @@ class Country(NamedTuple):
     cod: str
     eng: str = None
     ico: str = None
+    alpha_3: str = None
 
     def to_html(self):
         if self.ico:
@@ -40,7 +41,7 @@ def search_country(name: str):
                 if lw_name == value.lower():
                     return c
     for c in historic_countries:
-        for f in ("name", "official_name", "common_name"):
+        for f in ("name", "official_name", "common_name", "alpha_3"):
             if hasattr(c, f):
                 value = getattr(c, f)
                 if not isinstance(value, str):
@@ -76,12 +77,14 @@ def to_country(s: str) -> Country:
     if c is None:
         raise ValueError(f"País no encontrado: {s}")
     cod: str = c.alpha_2
+    alpha_3: str = getattr(c, 'alpha_3', None)
     name = LOCALE.territories.get(cod)
     return Country(
         cod=cod.lower(),
         spa=name,
-        eng=s,
-        ico=c.flag
+        eng=get_first(*map(lambda x: getattr(c, x, None), ('name', "common_name", "official_name"))),
+        ico=getattr(c, "flag", None),
+        alpha_3=alpha_3,
     )
 
 
@@ -124,3 +127,8 @@ def to_countries(cs: tuple[str, ...]):
         except ValueError as e:
             logger.critical(str(e))
     return tuple(arr)
+
+
+if __name__ == "__main__":
+    import sys
+    print(to_country(sys.argv[1]))

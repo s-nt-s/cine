@@ -122,12 +122,12 @@ class IMDBApi:
                 title=None,
                 director=None,
                 actor=None,
-                rating=row['rating'],
-                votes=row['votes'],
-                year=row['year'],
+                rating=get_positive(row, 'rating'),
+                votes=get_positive(row, 'votes'),
+                year=get_positive(row, 'year'),
                 countries=tp_split(" ", row['countries']),
                 wiki=row['wikipedia'],
-                duration=row['duration'],
+                duration=get_positive(row, 'duration'),
                 awards=None,
                 typ=row['type'],
                 genres=tuple(),
@@ -140,7 +140,7 @@ class IMDBApi:
             if not v.countries:
                 need_info.add(v.id)
         for i in sorted(need_info):
-            data = self.get_from_omdbapi(i)
+            data = self.get_from_omdbapi(i, autocomplete=i not in obj)
             countries[i] = to_alpha_3(dict_walk(data, 'Country', instanceof=(list, type(None))))
             if i in obj:
                 continue
@@ -193,7 +193,7 @@ class IMDBApi:
         return merge
 
     @cache
-    def get_from_omdbapi(self, id: str):
+    def get_from_omdbapi(self, id: str, autocomplete=True):
         if self.__omdbapi_activate is False or id in (None, ""):
             return None
         if not isinstance(id, str):
@@ -202,7 +202,7 @@ class IMDBApi:
         if js is None:
             return None
         js = mapdict(_clean_js, js, compact=True)
-        if self.__need_info(js):
+        if autocomplete and self.__need_info(js):
             soup_js = self.__get_from_imdb(id)
             if soup_js is None:
                 return js

@@ -31,8 +31,39 @@ def get_films():
             logger.debug(f"{v.url} descartado por {ko}")
             continue
         v = complete_film(v)
+        v._replace(genres=refine_genres(v) or v.genres)
         arr.append(v)
     return tuple(arr)
+
+
+def refine_genres(v: Film):
+    if v is None or not v.genres:
+        return None
+    set_g = set(v.genres)
+    if set_g.intersection({"Oeste", "Western"}):
+        return ("Western", )
+    if set_g.intersection({"Comedy", "Comedia"}):
+        return ("Comedia", )
+    if set_g.intersection({"Documental", }):
+        return ("Documental", )
+    if set_g.intersection({"Criminal", }):
+        return ("Suspense", )
+    if "Drama" in v.genres and "Terror" in v.genres:
+        return ("Suspense", )
+    if set_g.intersection({"Acción", "Aventuras"}):
+        return ("Aventuras", )
+    if set_g.intersection({"Romántico", "Romántica"}):
+        return ("Romántica", )
+    if set_g.intersection({"Infantil", }):
+        return ("Infantil", )
+    if set_g.intersection({"Fantasy", }):
+        return ("Fantástico", )
+
+    genres = list(v.genres)
+    for g in ("Clásicos", ):
+        if len(genres) > 1 and g in genres:
+            genres.remove(g)
+    return genres
 
 
 def complete_film(v: Film):
@@ -43,7 +74,7 @@ def complete_film(v: Film):
         return v._replace(imdb=None)
     if v.casting and v.director and v.genres:
         return v
-    x = IMDB.get_from_omdbapi(v.imdb.id)
+    x = IMDB.get_from_omdbapi(v.imdb.id, autocomplete=False)
     if not isinstance(x, dict):
         return v
     if not v.casting:
@@ -103,7 +134,7 @@ def iter_films():
             id=v.imdb,
         )
         yield v, imdb, Film(
-            source="efilm",
+            source="eFilm",
             id=v.id,
             url=v.get_url(),
             title=v.name,

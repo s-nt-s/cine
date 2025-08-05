@@ -143,70 +143,90 @@ class DBlite:
         )
 
     def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None) -> int | None:
-        if not isinstance(year, int):
-            return None
-        years = [year]
-        for i in range(1, 2):
-            years.append(year-i)
-            years.append(year+i)
-        for y in years:
-            id = self.__search_imdb(title, y, director)
-            if id is not None:
-                return id
+        if director is None:
+            director = tuple()
+        id_titles = self.__search_movie_by_title(title, min_year=year-5, max_year=year+5)
+        if len(id_titles) == 1:
+            return id_titles[0]
+        id_director = self.__search_movie_by_director(*director, min_year=year-5, max_year=year+5)
+        if len(id_director) == 1:
+            return id_director[0]
+        ok = set(id_director).intersection(id_director)
+        if len(ok) == 1:
+            return ok.pop()
         return None
 
     @cache
-    def __search_title(self, title: str) -> tuple[tuple[str, ...], ...]:
-        if not isinstance(title, str):
+    def __search_movie_by_title(self, *titles: str, min_year=None, max_year=None) -> tuple[tuple[str, ...], ...]:
+        arr_titles = []
+        for t in titles:
+            t = t.strip()
+            if t and t not in arr_titles:
+                arr_titles.append(t)
+        if len(arr_titles) == 0:
             return tuple()
-        title = title.strip().lower()
-        if len(title) == 0:
-            return tuple()
-        arr = []
-        for t, w in (
-            ('TITLE', "title = ? COLLATE NOCASE"),
-            ('TITLE_FTS', "title MATCH ?"),
-            #"lower(title) like ('%' || ? || '%')"
-        ):
-            tt = escape_fts5(title) if t.endswith("_FTS") else title
-            ids = self.to_tuple(f"select movie from {t} where {w}", tt)
-            if len(ids):
-                arr.append(ids)
-        return tuple(arr)
+        sql = []
+        arg = []
+        for title in arr_titles:
+            for t, w in (
+                ('TITLE', "title = ? COLLATE NOCASE"),
+                ('TITLE_FTS', "title MATCH ?"),
+                #"lower(title) like ('%' || ? || '%')"
+            ):
+                tt = escape_fts5(title) if t.endswith("_FTS") else title
+                sql.append(f"select movie from {t} where {w}")
+                arg.append(tt)
+        main_sql = "select distinct movie from (" + (" union ".join(sql)) + ")"
+        if min_year or max_year:
+            main_sql = main_sql+" where movie in (select id from movie where"
+            if min_year:
+                main_sql = main_sql+f" year > {min_year}"
+            if min_year and max_year:
+                main_sql = main_sql+" and"
+            if max_year:
+                main_sql = main_sql+f" year < {max_year}"
+            main_sql = main_sql + ")"
+        ids = self.to_tuple(
+            main_sql,
+            *arg
+        )
+        return ids
 
-    def __search_imdb(self, title: str, year: int, director: tuple[str, ...] = None) -> int | None:
-        id_title = tuple()
-        titles = list(self.__search_title(title))
-        while len(id_title) == 0 and titles:
-            tt = titles.pop(0)
-            id_title = self.to_tuple(f"""
-                select id from movie
-                where
-                    year = ? and
-                    id {gW(tt)}
-            """, year, *tt)
-        if len(id_title) == 1:
-            return id_title[0]
-        directos = self.search_person(*(director or tuple()))
-        if len(directos) == 0:
-            return None
-        id_dir = self.to_tuple(f"""
-            select id from movie
-            where
-                year = ? and
-                id in (
-                      select movie
-                      from
-                        director
-                      where
-                        person {gW(directos)}
-                )
-        """, year, *directos)
-        if len(id_dir) == 1:
-            return id_dir[0]
-        ok = set(id_dir).intersection(id_title)
-        if len(ok) == 1:
-            return ok.pop()
+    @cache
+    def __search_movie_by_director(self, *directors: str, min_year=None, max_year=None) -> tuple[tuple[str, ...], ...]:
+        arr_directors = []
+        for d in directors:
+            d = d.strip()
+            if d and d not in arr_directors:
+                arr_directors.append(d)
+        if len(arr_directors) == 0:
+            return tuple()
+        sql = []
+        arg = []
+        for director in arr_directors:
+            for t, w in (
+                ('PERSON', "lower(name) = ? COLLATE NOCASE"),
+                ('PERSON_FTS', "name MATCH ?"),
+                #('', "lower(name) like ('%' || ? || '%')")
+            ):
+                n = escape_fts5(director) if t.endswith("_FTS") else director
+                sql.append(f"select id from {t} where {w}")
+                arg.append(n)
+        main_sql = "select distinct movie from director where person in (" + (" union ".join(sql)) + ")"
+        if min_year or max_year:
+            main_sql = main_sql+" and movie in (select id from movie where"
+            if min_year:
+                main_sql = main_sql+f" year > {min_year}"
+            if min_year and max_year:
+                main_sql = main_sql+" and"
+            if max_year:
+                main_sql = main_sql+f" year < {max_year}"
+            main_sql = main_sql + ")"
+        ids = self.to_tuple(
+            main_sql,
+            *arg
+        )
+        return ids
 
 
 DB = DBlite("imdb.sqlite")

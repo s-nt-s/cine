@@ -167,10 +167,13 @@ class DictCache(Cache):
         if not path.is_file():
             url, data = self.__find_in_mirror(path.name)
             if isinstance(data, dict):
-                ts_time = to_timestamp(data.get('__time__'))
-                logger.info(f"{url} (__time__={ts_time}) -> {fl}")
+                tm = data.get('__time__')
+                ts_time = to_timestamp(tm)
                 self.save(fl, data)
-                if ts_time is not None:
+                if ts_time is None:
+                    logger.debug(f"{url} -> {fl}")
+                else:
+                    logger.debug(f"{url} (time={tm}) -> {fl}")
                     os.utime(path, (ts_time, ts_time))
         if not path.is_file():
             return True
