@@ -170,7 +170,7 @@ class EFilm:
             arr.append(f'year={year} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        if provider in ('Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
+        if provider in ('Mondo', ): #'Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
             arr.append(f'provider={provider}')
         return tuple(arr)
 

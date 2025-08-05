@@ -152,9 +152,8 @@ class DictCache(Cache):
             url = m + name
             data = R.safe_get_json(url)
             if isinstance(data, dict):
-                data['__time__'] = to_timestamp(data.get('__time__'))
+                new_time = to_timestamp(data.get('__time__')) or -1
                 old_time = d.get('__time__')
-                new_time = data['__time__'] or -1
                 if old_time is None or (new_time > old_time):
                     u, d = url, data
         if u is not None:

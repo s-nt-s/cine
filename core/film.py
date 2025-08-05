@@ -45,3 +45,15 @@ class Film(NamedTuple):
     casting: tuple[str, ...]
     genres: tuple[str, ...]
     imdb: Optional[IMDb] = None
+    provider: str = None
+
+    def get_provider(self):
+        if self.source.lower() == "rtve":
+            return "rtve"
+        if self.provider is None:
+            return self.source
+        if self.source is None:
+            return self.provider
+        if self.source.lower() == self.provider.lower():
+            return self.provider
+        return f"{self.source} - {self.provider}"

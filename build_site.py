@@ -60,6 +60,18 @@ def get_expiration(fmls: tuple[Film]):
     return exp
 
 
+def _sort_provider(x: str):
+    arr = []
+    arr.append(-int(x.lower() == "rtve"))
+    tp = tuple(x.split(" - "))
+    arr.append(len(tp))
+    arr.append(tp)
+    return tuple(arr)
+
+
+providers: set[str] = set(f.get_provider() for f in films)
+providers = sorted(providers, key=_sort_provider)
+
 j = Jnj2(
     "template/",
     "out/",
@@ -74,6 +86,7 @@ j.create_script(
 j.save(
     "index.html",
     fl=films,
+    providers=providers,
     NOW=NOW,
     count=len(films)
 )

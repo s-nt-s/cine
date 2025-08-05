@@ -434,6 +434,16 @@ function onChange() {
   ifChange(form, "order", (newVal, oldVal) => {
     ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
   });
+  ifChange(form, "show", (newVal, oldVal) => {
+    const css = document.getElementById("dynamicStyle");
+    if (css == null) return;
+    if (newVal == null) return css.innerHTML = "";
+    css.innerHTML = `
+    div.film:not(.${newVal}) {
+      display:none !important;
+    }
+    `
+  });
 
   FormQuery.form_to_query();
 }

@@ -95,7 +95,8 @@ def iter_films():
             filmaffinity=imdb.filmaffinity,
             director=v.director,
             casting=v.casting,
-            genres=get_rtve_genres(v, imdb)
+            genres=get_rtve_genres(v, imdb),
+            provider="rtve"
         )
     for v in eflim:
         imdb = info_imdb.get(v.imdb) or IMDBInfo(
@@ -123,7 +124,8 @@ def iter_films():
             filmaffinity=imdb.filmaffinity,
             director=v.director,
             casting=v.actors,
-            genres=v.genres
+            genres=v.genres,
+            provider=v.provider
         )
 
 
