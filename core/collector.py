@@ -31,7 +31,7 @@ def get_films():
             logger.debug(f"{v.url} descartado por {ko}")
             continue
         v = complete_film(v)
-        v._replace(genres=refine_genres(v) or v.genres)
+        v = v._replace(genres=refine_genres(v) or v.genres)
         arr.append(v)
     return tuple(arr)
 
@@ -63,7 +63,7 @@ def refine_genres(v: Film):
     for g in ("Clásicos", ):
         if len(genres) > 1 and g in genres:
             genres.remove(g)
-    return genres
+    return tuple(genres)
 
 
 def complete_film(v: Film):

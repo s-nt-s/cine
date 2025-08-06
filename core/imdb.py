@@ -194,7 +194,7 @@ class IMDBApi:
 
     @cache
     def get_from_omdbapi(self, id: str, autocomplete=True):
-        if self.__omdbapi_activate is False or id in (None, ""):
+        if id in (None, ""):
             return None
         if not isinstance(id, str):
             raise ValueError(id)
