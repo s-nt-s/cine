@@ -14,12 +14,17 @@ from core.filemanager import FM, DictFile
 
 
 logger = logging.getLogger(__name__)
+re_sp = re.compile(r"\s+")
 
 
-def _get_first(*args):
-    for a in args:
-        if a is not None:
-            return a
+def _clean_name(s):
+    if not isinstance(s, str):
+        return s
+    s = re_sp.sub(" ", s).strip()
+    if len(s) == 0:
+        return None
+    s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT)$", "", s)
+    return s
 
 
 def _to_tuple(*args, exclude: tuple = None):
@@ -199,7 +204,7 @@ class EFilm:
                 coun.append(ct.get('code'))
             v = Video(
                 id=i['id'],
-                name=i.get('name'),
+                name=_clean_name(i.get('name')),
                 slug=i['slug'],
                 typ=i['type'],
                 cover=i.get('cover'),

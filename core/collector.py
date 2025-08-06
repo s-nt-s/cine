@@ -31,7 +31,7 @@ def get_films():
             logger.debug(f"{v.url} descartado por {ko}")
             continue
         v = complete_film(v)
-        v = v._replace(genres=refine_genres(v) or v.genres)
+        ##v = v._replace(genres=refine_genres(v) or v.genres)
         arr.append(v)
     return tuple(arr)
 
@@ -204,14 +204,6 @@ def get_rtve_genres(v: RtveVideo, imdb_info: IMDBInfo):
         return ("Suspense", )
     if re_or(v.ecortContent, r"Thriller"):
         return ("Suspense", )
-    if "Biography" in imdb_info.genres:
-        return ("Biográfico", )
-    if "Thriller" in imdb_info.genres:
-        return ("Suspense", )
-    if len(set(("Crime", "Mystery")).difference(imdb_info.genres)) == 0:
-        return ("Suspense", )
-    if "Horror" in imdb_info.genres:
-        return ("Terror", )
     genres: set[str] = set()
     for g in v.genres:
         if g in (None, "Cine", "Cultura"):
@@ -227,6 +219,8 @@ def get_rtve_genres(v: RtveVideo, imdb_info: IMDBInfo):
         genres.add(g)
     if len(genres):
         return tuple(genres)
+    if imdb_info.genres:
+        return imdb_info.genres
     if re_or(v.ecortContent, "[dD]rama"):
         return ("Drama", )
-    return imdb_info.genres
+    return tuple()
