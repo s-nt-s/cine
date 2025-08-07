@@ -138,7 +138,7 @@ def iter_films():
             id=v.id,
             url=v.get_url(),
             title=v.name,
-            img=get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer, imdb.img),
+            img=get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
             lang=v.lang,
             country=to_countries(imdb.countries or v.countries),
             description=v.description,
@@ -179,8 +179,12 @@ def is_ko(source, i: IMDBInfo):
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:
     if v.img_vertical:
         return v.img_vertical[0]
-    if imdb_info and imdb_info.img:
-        return imdb_info.img
+    if imdb_info and isinstance(imdb_info.id, str):
+        info = IMDB.get_from_omdbapi(imdb_info.id)
+        if isinstance(info, dict) and isinstance(info.get('Poster'), str):
+            poster = info.get("Poster").strip()
+            if len(poster):
+                return poster
     if v.img_horizontal:
         return v.img_horizontal[0]
     if v.img_others:

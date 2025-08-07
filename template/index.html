@@ -42,11 +42,11 @@
           <option value="lista" selected>lista</option>
           <option value="cuadricula">cuadricula</option>
         </select>
-        <label for="show">Mostrar solo</label>
+        <label for="show">Mostrar</label>
         <select id="show" data-type="flag">
-          <option value="" selected>todo</option>
-          {% for p in providers %}
-          <option value="{{p|simplify}}">{{p}}</option>
+          <option value="todo" selected>todo</option>
+          {% for p, c in providers.items() %}
+          <option value="{{p|simplify}}">{{p}} ({{c}})</option>
           {% endfor %}
         </select>
     </p>

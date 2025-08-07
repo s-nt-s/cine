@@ -69,8 +69,10 @@ def _sort_provider(x: str):
     return tuple(arr)
 
 
-providers: set[str] = set(f.get_provider() for f in films)
-providers = sorted(providers, key=_sort_provider)
+providers: dict[str, int] = {}
+for f in films:
+    providers[f.get_provider()] = providers.get(f.get_provider(), 0) + 1
+providers = dict(sorted(providers.items(), key=lambda kv: _sort_provider(kv[0])))
 
 j = Jnj2(
     "template/",

@@ -143,7 +143,6 @@ class DBlite:
         )
 
     def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None, duration: int = None) -> int | None:
-        return None
         if director is None:
             director = None
         id_titles = self.__search_movie_by_title(title, min_year=year-5, max_year=year+5, duration=duration)
