@@ -64,7 +64,7 @@
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>
-          <p><b>{{f.director|yjoin}}</b>{%if f.director|length > 0 and f.casting|length > 0 %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
+          <p><b>{{f.director|yjoin}}</b>{%if ((f.director|length) > 0) and ((f.casting|length) > 0) %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
           <p>{{f.description}}</p>
       </div>
       {% endfor %}

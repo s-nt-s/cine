@@ -17,13 +17,16 @@ logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
 
 
-def _clean_name(s):
+def _clean_name(s, year: int):
     if not isinstance(s, str):
         return s
     s = re_sp.sub(" ", s).strip()
     if len(s) == 0:
         return None
     s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT|\(restaurado Archangel\))$", "", s)
+    s = re.sub(r"\s*-\s*Castellano$", "", s)
+    if isinstance(year, int) and year>0:
+        s = re.sub(r"\s*\(\s*"+str(year)+r"\s*)$", "", s)
     return s
 
 
@@ -175,7 +178,7 @@ class EFilm:
             arr.append(f'year={year} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        if provider in ('Mondo', ): #'Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
+        if provider in ('Mondo', "Miguel Rodríguez arias"): #'Azteca', "Alex Quiroga"):
             arr.append(f'provider={provider}')
         return tuple(arr)
 
@@ -202,16 +205,17 @@ class EFilm:
                 if not isinstance(ct, dict):
                     raise ValueError(ct)
                 coun.append(ct.get('code'))
+            year = i['year']
             v = Video(
                 id=i['id'],
-                name=_clean_name(i.get('name')),
+                name=_clean_name(i.get('name'), year),
                 slug=i['slug'],
                 typ=i['type'],
                 cover=i.get('cover'),
                 cover_horizontal=i.get('cover_horizontal'),
                 actors=tuple(i.get('actors') or []),
                 duration=i['duration'],
-                year=i['year'],
+                year=year,
                 genres=tuple(x['name'] for x in (i.get('genres') or [])),
                 description=i.get('description'),
                 covers=tuple(x['cover'] for x in (i.get('covers') or [])),
