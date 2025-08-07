@@ -263,7 +263,7 @@ class Rtve(Web):
             return None
         if v.idImdb is None:
             v = v._replace(
-                idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director)
+                idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director, v.duration)
             )
             self.__cache.set(idAsset, v.idImdb)
         return v

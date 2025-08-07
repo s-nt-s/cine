@@ -142,13 +142,13 @@ class DBlite:
             votes=row[4]
         )
 
-    def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None) -> int | None:
+    def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None, duration: int = None) -> int | None:
         if director is None:
             director = tuple()
-        id_titles = self.__search_movie_by_title(title, min_year=year-5, max_year=year+5)
+        id_titles = self.__search_movie_by_title(title, min_year=year-5, max_year=year+5, duration=duration)
         if len(id_titles) == 1:
             return id_titles[0]
-        id_director = self.__search_movie_by_director(*director, min_year=year-5, max_year=year+5)
+        id_director = self.__search_movie_by_director(*director, min_year=year-5, max_year=year+5, duration=duration)
         if len(id_director) == 1:
             return id_director[0]
         ok = set(id_director).intersection(id_director)
@@ -157,7 +157,7 @@ class DBlite:
         return None
 
     @cache
-    def __search_movie_by_title(self, *titles: str, min_year=None, max_year=None) -> tuple[tuple[str, ...], ...]:
+    def __search_movie_by_title(self, *titles: str, min_year=None, max_year=None, duration: int = None) -> tuple[tuple[str, ...], ...]:
         arr_titles = []
         for t in titles:
             t = t.strip()
@@ -177,15 +177,17 @@ class DBlite:
                 sql.append(f"select movie from {t} where {w}")
                 arg.append(tt)
         main_sql = "select distinct movie from (" + (" union ".join(sql)) + ")"
-        if min_year or max_year:
-            main_sql = main_sql+" where movie in (select id from movie where"
-            if min_year:
-                main_sql = main_sql+f" year > {min_year}"
-            if min_year and max_year:
-                main_sql = main_sql+" and"
-            if max_year:
-                main_sql = main_sql+f" year < {max_year}"
-            main_sql = main_sql + ")"
+        where = []
+        if duration:
+            where.append(f"duration < {duration+10}")
+            where.append(f"duration > {duration-10}")
+        if min_year:
+            where.append(f"year > {min_year}")
+        if max_year:
+            where.append(f"year < {max_year}")
+        if where:
+            main_sql = main_sql+" where movie in (select id from movie where " 
+            main_sql = main_sql+(" and ".join(where)) + ")"
         ids = self.to_tuple(
             main_sql,
             *arg
@@ -193,7 +195,7 @@ class DBlite:
         return ids
 
     @cache
-    def __search_movie_by_director(self, *directors: str, min_year=None, max_year=None) -> tuple[tuple[str, ...], ...]:
+    def __search_movie_by_director(self, *directors: str, min_year=None, max_year=None, duration: int = None) -> tuple[tuple[str, ...], ...]:
         arr_directors = []
         for d in directors:
             d = d.strip()
@@ -213,15 +215,17 @@ class DBlite:
                 sql.append(f"select id from {t} where {w}")
                 arg.append(n)
         main_sql = "select distinct movie from director where person in (" + (" union ".join(sql)) + ")"
-        if min_year or max_year:
-            main_sql = main_sql+" and movie in (select id from movie where"
-            if min_year:
-                main_sql = main_sql+f" year > {min_year}"
-            if min_year and max_year:
-                main_sql = main_sql+" and"
-            if max_year:
-                main_sql = main_sql+f" year < {max_year}"
-            main_sql = main_sql + ")"
+        where = []
+        if duration:
+            where.append(f"duration < {duration+10}")
+            where.append(f"duration > {duration-10}")
+        if min_year:
+            where.append(f"year > {min_year}")
+        if max_year:
+            where.append(f"year < {max_year}")
+        if where:
+            main_sql = main_sql+" and movie in (select id from movie where "
+            main_sql = main_sql+(" and ".join(where)) + ")"
         ids = self.to_tuple(
             main_sql,
             *arg

@@ -23,7 +23,7 @@ def _clean_name(s):
     s = re_sp.sub(" ", s).strip()
     if len(s) == 0:
         return None
-    s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT)$", "", s)
+    s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT|\(restaurado Archangel\))$", "", s)
     return s
 
 
@@ -232,7 +232,7 @@ class EFilm:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
             if v.imdb is None:
-                imdb = DB.search_imdb_id(v.name, v.year, v.director)
+                imdb = DB.search_imdb_id(v.name, v.year, v.director, v.duration)
                 if imdb:
                     v = v._replace(imdb=imdb)
                     self.__cache.set(v.id, imdb)
