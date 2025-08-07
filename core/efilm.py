@@ -25,8 +25,8 @@ def _clean_name(s, year: int):
         return None
     s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT|\(restaurado Archangel\))$", "", s)
     s = re.sub(r"\s*-\s*Castellano$", "", s)
-    if isinstance(year, int) and year>0:
-        s = re.sub(r"\s*\(\s*"+str(year)+r"\s*)$", "", s)
+    if isinstance(year, int) and year > 0:
+        s = re.sub(r"\s*\(\s*"+str(year)+r"\s*\)$", "", s)
     return s
 
 
