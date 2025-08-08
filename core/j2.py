@@ -59,7 +59,7 @@ class CustomEncoder(json.JSONEncoder):
 
 
 def simplify(s: str):
-    re_rm = re.compile(r"[/\.\(\)\[\]]+")
+    re_rm = re.compile(r"[/\.\(\)\[\]&]+")
     s = re_rm.sub(" ", str(s)).strip().lower()
     s = re_sp.sub(" ", s).strip().lower()
     s = unidecode(s)

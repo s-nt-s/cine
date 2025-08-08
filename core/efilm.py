@@ -2,23 +2,32 @@ from typing import Any
 from core.cache import Cache
 from core.util import mapdict
 import requests
-from requests.exceptions import JSONDecodeError
+from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
+from json.decoder import JSONDecodeError as DecoderJSONDecodeError
 from typing import NamedTuple
 import logging
 import time
 from core.util import tp_split
-from functools import cached_property
-from core.film import Film
-from core.country import to_country
 import re
+from core.dblite import DB
+from core.filemanager import FM, DictFile
+
 
 logger = logging.getLogger(__name__)
+re_sp = re.compile(r"\s+")
 
 
-def _get_first(*args):
-    for a in args:
-        if a is not None:
-            return a
+def _clean_name(s, year: int):
+    if not isinstance(s, str):
+        return s
+    s = re_sp.sub(" ", s).strip()
+    if len(s) == 0:
+        return None
+    s = re.sub(r" (Gaumont|\(Kurosawa\)|ANT|\(restaurado Archangel\))$", "", s)
+    s = re.sub(r"\s*-\s*Castellano$", "", s)
+    if isinstance(year, int) and year > 0:
+        s = re.sub(r"\s*\(\s*"+str(year)+r"\s*\)$", "", s)
+    return s
 
 
 def _to_tuple(*args, exclude: tuple = None):
@@ -44,7 +53,7 @@ class Video(NamedTuple):
     genres: tuple[str, ...]
     description: str
     covers: tuple[str, ...]
-    director_name: str
+    director: tuple[str, ...]
     banner_main: str
     banner_trailer: str
     provider_slug: str
@@ -55,6 +64,7 @@ class Video(NamedTuple):
     countries: tuple[str, ...]
     created: str
     expire: str
+    imdb: str | None
 
     @staticmethod
     def mk_url(id: int, slug: str):
@@ -67,7 +77,7 @@ class Video(NamedTuple):
 def _clean_js(k: str, obj: list | dict | str):
     if isinstance(obj, str):
         obj = obj.strip()
-        if len(obj) == 0:
+        if obj in ('', 'No hay es un documental'):
             return None
     return obj
 
@@ -83,6 +93,7 @@ def _g_date(dt: str):
 
 class EFilm:
     def __init__(self, origin: str, min_duration=50):
+        self.__cache = DictFile("cache/efilm.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
         self.__origin = origin
@@ -104,7 +115,7 @@ class EFilm:
                 continue
             try:
                 return r.json()
-            except JSONDecodeError:
+            except (DecoderJSONDecodeError, RequestsJSONDecodeError):
                 logger.critical(f"{r.status_code} {url}")
                 raise
 
@@ -125,7 +136,7 @@ class EFilm:
 
     @Cache("rec/efilm/items.json")
     def get_items(self) -> list[dict]:
-        root = f"https://backend-prod.efilm.online/api/v1/products/products/relevant/?duration_gte={self.__min_duration}&page=1&page_size=9999&product_type=audiovisual&skip_chapters=true"
+        root = f"https://backend-prod.efilm.online/api/v1/products/products/relevant/?duration_gte={self.__min_duration}&page=1&page_size=1000&product_type=audiovisual&skip_chapters=true"
         done: set[int] = set()
         arr = []
         i: dict
@@ -155,18 +166,19 @@ class EFilm:
         genres = tuple(x['name'] for x in (i.get('genres') or []))
         gamma = (i.get('gamma') or {}).get('name_show')
         duration = i.get('duration', 999999)
-        director_name=i.get('director_name')
+        director_name = i.get('director_name')
+        year = i['year']
         if typ in ('game', ):
             arr.append(f'type={typ}')
         if gamma in ('Azul', ):
             arr.append(f'gamma={gamma}')
         if director_name in (None, ""):
             arr.append("director=None")
-        if duration < self.__min_duration:
-            arr.append(f'duration={duration}')
+        if year > 1960 and duration < self.__min_duration:
+            arr.append(f'year={year} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        if provider in ('Azteca', "Miguel Rodríguez arias", "Alex Quiroga"):
+        if provider in ('Mondo', "Miguel Rodríguez arias"): #'Azteca', "Alex Quiroga"):
             arr.append(f'provider={provider}')
         return tuple(arr)
 
@@ -185,24 +197,29 @@ class EFilm:
             subt = []
             coun = []
             for ln in (ficha.get('languages') or []):
+                if not isinstance(ln, dict):
+                    raise ValueError(ln)
                 lang.append((ln.get('language') or {}).get('code_iso3'))
                 lang.append((ln.get('subtitle') or {}).get('code_iso3'))
             for ct in (ficha.get('countries') or []):
+                if not isinstance(ct, dict):
+                    raise ValueError(ct)
                 coun.append(ct.get('code'))
+            year = i['year']
             v = Video(
                 id=i['id'],
-                name=i.get('name'),
+                name=_clean_name(i.get('name'), year),
                 slug=i['slug'],
                 typ=i['type'],
                 cover=i.get('cover'),
                 cover_horizontal=i.get('cover_horizontal'),
                 actors=tuple(i.get('actors') or []),
                 duration=i['duration'],
-                year=i['year'],
+                year=year,
                 genres=tuple(x['name'] for x in (i.get('genres') or [])),
                 description=i.get('description'),
                 covers=tuple(x['cover'] for x in (i.get('covers') or [])),
-                director_name=i.get('director_name'),
+                director=tp_split("/", i.get('director_name')),
                 banner_main=i.get('banner_main'),
                 banner_trailer=i.get('banner_trailer'),
                 provider_slug=i.get('provider_slug'),
@@ -212,46 +229,25 @@ class EFilm:
                 subtitle=_to_tuple(*subt, exclude=('mis', )),
                 countries=_to_tuple(*coun),
                 created=ficha.get('created'),
-                expire=ficha.get('expire')
+                expire=ficha.get('expire'),
+                imdb=self.__cache.get(i['id'])
             )
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
+            if v.imdb is None:
+                imdb = DB.search_imdb_id(v.name, v.year, v.director, v.duration)
+                if imdb:
+                    v = v._replace(imdb=imdb)
+                    self.__cache.set(v.id, imdb)
             arr.add(v)
+        self.__cache.dump()
+        logger.info(f"{len(arr)} recuperados de efilm")
         return tuple(sorted(arr, key=lambda v: v.id))
-
-    @cached_property
-    def films(self):
-        arr: set[Film] = set()
-        for v in self.get_videos():
-            v = Film(
-                source="efilm",
-                id=v.id,
-                title=v.name,
-                url=v.get_url(),
-                img=_get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
-                lang=v.lang,
-                country=tuple(map(to_country, v.countries)),
-                description=v.description,
-                year=v.year,
-                expiration=_g_date(v.expire),
-                publication=_g_date(v.created),
-                duration=v.duration,
-                imdb=None,
-                wiki=None,
-                filmaffinity=None,
-                director=tp_split("/", v.director_name),
-                casting=v.actors,
-                genres=v.genres,
-                program=None
-            )
-            arr.add(v)
-        return tuple(sorted(arr, key=lambda x: x.id))
 
 
 if __name__ == "__main__":
     from core.log import config_log
-    import sys
     from core.filemanager import FM
     config_log("log/efilm.log")
     e = EFilm()

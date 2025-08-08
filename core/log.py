@@ -13,7 +13,8 @@ CRITICAL = (
     'asyncio',
     'PIL.Image',
     'PIL.PngImagePlugin',
-    'PIL.TiffImagePlugin'
+    'PIL.TiffImagePlugin',
+    'pycountry.db'
 )
 
 

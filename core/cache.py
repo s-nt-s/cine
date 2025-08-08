@@ -3,6 +3,9 @@ import os
 import time
 import logging
 import hashlib
+from datetime import datetime
+import re
+from core.req import R
 
 from .filemanager import FM
 
@@ -11,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 def myhash(s: str) -> str:
     return hashlib.sha256(s.encode('utf-8')).hexdigest()
+
+
+def to_timestamp(s):
+    if not isinstance(s, str):
+        return None
+    return datetime(*map(int, re.findall(r"\d+", s))).timestamp()
 
 
 class Cache:
@@ -39,7 +48,7 @@ class Cache:
             return
         FM.dump(file, data, **self._kwargs)
 
-    def tooOld(self, fl):
+    def tooOld(self, fl: str):
         if fl is None:
             return True
         if not os.path.isfile(fl):
@@ -126,3 +135,57 @@ class HashCache(Cache):
         if args or kwargs:
             return self.file.format(*args, **kwargs)
         return self.file
+
+
+class DictCache(Cache):
+    def __init__(self, *args, mirror: tuple[str, ...], **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__mirror = tuple()
+        if isinstance(mirror, str):
+            self.__mirror = tuple(mirror.strip().split())
+        elif isinstance(mirror, tuple):
+            self.__mirror = mirror
+
+    def __find_in_mirror(self, name: str) -> tuple[str, dict] | tuple[None, None]:
+        u, d = None, {}
+        for m in self.__mirror:
+            url = m + name
+            data = R.safe_get_json(url)
+            if isinstance(data, dict):
+                new_time = to_timestamp(data.get('__time__')) or -1
+                old_time = d.get('__time__')
+                if old_time is None or (new_time > old_time):
+                    u, d = url, data
+        if u is not None:
+            return u, d
+        return None, None
+
+    def tooOld(self, fl: str):
+        if fl is None:
+            return True
+        path = FM.resolve_path(fl)
+        if not path.is_file():
+            url, data = self.__find_in_mirror(path.name)
+            if isinstance(data, dict):
+                tm = data.get('__time__')
+                ts_time = to_timestamp(tm)
+                self.save(fl, data)
+                if ts_time is None:
+                    logger.debug(f"{url} -> {fl}")
+                else:
+                    logger.debug(f"{url} (time={tm}) -> {fl}")
+                    os.utime(path, (ts_time, ts_time))
+        if not path.is_file():
+            return True
+        if self.reload:
+            return True
+        if self.maxOld is None:
+            return False
+        if os.stat(fl).st_mtime < self.maxOld:
+            return True
+        return False
+
+    def save(self, file, data, *args, **kwargs):
+        if isinstance(data, dict):
+            data['__time__'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        return super().save(file, data, *args, **kwargs)

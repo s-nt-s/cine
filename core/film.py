@@ -1,5 +1,6 @@
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from core.wiki import WikiUrl
+import re
 
 
 class IMDb(NamedTuple):
@@ -32,7 +33,6 @@ class Film(NamedTuple):
     url: str
     title: str
     img: str
-    program: str
     lang: tuple[str, ...]
     country: tuple[tuple[str, str], ...]
     description: str
@@ -40,9 +40,24 @@ class Film(NamedTuple):
     expiration: str
     publication: str
     duration: int
-    imdb: IMDb
     wiki: WikiUrl
     filmaffinity: str | None
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]
+    imdb: Optional[IMDb] = None
+    provider: str = None
+
+    def get_provider(self):
+        if self.source.lower() == "rtve":
+            return "rtve"
+        if self.provider is None:
+            return self.source
+        pr = str(self.provider)
+        if not re.search(r"\d", pr):
+            pr = pr.title()
+        if self.source is None:
+            return pr
+        if self.source.lower() == pr.lower():
+            return self.source
+        return f"{self.source} - {pr}"

@@ -11,6 +11,7 @@ import pytz
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 from collections import Counter
+from os import environ
 
 import uuid
 
@@ -64,7 +65,7 @@ def dict_walk_tuple(data: dict, path: str):
     vals = []
     for i in arr:
         if isinstance(i, str):
-            i = i.strip()
+            i = re_sp.sub(" ", i).strip()
         if i not in ([None, ""]+vals):
             vals.append(i)
     return tuple(vals)
@@ -508,14 +509,24 @@ def to_uuid(s: str):
 def uniq(*args: Union[str, None]):
     arr: List[str] = []
     for a in args:
-        if a not in (None, '') and a not in arr:
+        if a not in (None, '', 'None', 'none', 'null') and a not in arr:
             arr.append(a)
     return arr
+
+
+def tp_uniq(arr):
+    if arr is None:
+        return tuple()
+    if not isinstance(arr, (list, tuple, set)):
+        raise ValueError(arr)
+    return tuple(uniq(*arr))
 
 
 def tp_split(sep: str, s: str) -> tuple[str, ...]:
     if s is None:
         return tuple()
+    if not isinstance(s, str):
+        raise ValueError(s)
     spl = re.split(r"\s*"+re.escape(sep)+r"\s*", s)
     return tuple(uniq(*spl))
 
@@ -554,3 +565,30 @@ def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = Non
                 obj = None
         return obj
     return obj
+
+
+def get_env(*args: str, default: str = None) -> str | None:
+    for a in args:
+        v = environ.get(a)
+        if isinstance(v, str):
+            v = v.strip()
+            if len(v):
+                return v
+    return default
+
+
+def get_first(*args):
+    for a in args:
+        if a is not None:
+            return a
+
+
+def iter_chunk(size: int, args: list):
+    arr = []
+    for a in args:
+        arr.append(a)
+        if len(arr) == size:
+            yield arr
+            arr = []
+    if arr:
+        yield arr

@@ -124,13 +124,13 @@ span.documental {
 span.cultura {
   background-color:orange;
 }
-span.western {
+span.western, span.oeste {
   background-color:maroon;
 }
 span.comedia {
   background-color:green;
 }
-span.romantica {
+span.romantica,span.romantico {
   background-color:pink;
 }
 span.infantil {
@@ -139,7 +139,7 @@ span.infantil {
 span.terror {
   background-color: red;
 }
-span.aventuras {
+span.aventuras, span.accion {
   background-color: blueviolet;
 }
 span.historico {
@@ -274,4 +274,21 @@ p.botonera {
 p.botonera > * {
   line-height: normal;
   vertical-align: middle;
+}
+
+span.povider {
+  white-space: nowrap;
+  font-weight: bold;
+}
+span.povider.rtve {
+  font-family: "Officina Serif", "Montserrat", serif;
+  color: #FF6600;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+}
+
+span.povider[class*='efilm'] {
+  font-family: "Arial Narrow", "Arial", sans-serif;
+  letter-spacing: 0.05em;
+  color: #F36C5D;
 }

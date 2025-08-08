@@ -19,6 +19,7 @@
   <script src="info.js"></script>
   <script src="rec/supabase.js"></script>
   <script src="rec/main.js"></script>
+  <style id="dynamicStyle"></style>
 </head>
 
 <body>
@@ -41,22 +42,31 @@
           <option value="lista" selected>lista</option>
           <option value="cuadricula">cuadricula</option>
         </select>
+        <label for="show">Mostrar</label>
+        <select id="show" data-type="flag">
+          <option value="todo" selected>todo</option>
+          {% for p, c in providers.items() %}
+          <option value="{{p|simplify}}">{{p}} ({{c}})</option>
+          {% endfor %}
+        </select>
     </p>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="{{f.source}}{{f.id}}">
+      <div class="film {{f.source}} {{f.get_provider()|simplify}}" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
         <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
           <p class="botonera">
             {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
             {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}
-            {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}</p>
+            {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
+            {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}
+          </p>
           <p>
-          {{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
+          {{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%} <span class="povider {{f.get_provider()|simplify}}">{{f.get_provider()}}</span></p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>
-          <p><b>{{f.director|yjoin}}</b>{%if f.director and f.casting %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
+          <p><b>{{f.director|yjoin}}</b>{%if f.casting %} || <span>{{f.casting|yjoin}}</span>{% endif %}</p>
           <p>{{f.description}}</p>
       </div>
       {% endfor %}

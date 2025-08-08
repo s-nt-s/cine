@@ -229,17 +229,22 @@ function ifLocal() {
     a.href = url;
     return a;
   }
-  const gId = (s) => {
+  const gId = (s, x) => {
     while (s.endsWith("/")) s = s.substring(0, s.length-1);
     const spl = s.split("/");
-    return spl[spl.length-1];
+    return spl[spl.length-x];
   }
-  document.querySelectorAll("div.film").forEach(i=>{
+  document.querySelectorAll("div.film.rtve").forEach(i=>{
     const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
-    if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href)}.json`));
-    if (imdb) p.append(" ", mkA(`../rec/imdb/${gId(imdb.href)}.json`));
+    if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href, 1)}.json`));
+    if (imdb) p.append(" ", mkA(`../omdb/${gId(imdb.href, 1)}.json`));
+  })
+  document.querySelectorAll("div.film.eflim").forEach(i=>{
+    const p = i.querySelector("p");
+    const tit = i.querySelector("a.title");
+    tit.append(" ", mkA(`../../rec/efilm/ficha/${gId(tit.href, 2)}.json`));
   })
 }
 
@@ -428,6 +433,16 @@ function onChange() {
   });
   ifChange(form, "order", (newVal, oldVal) => {
     ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
+  });
+  ifChange(form, "show", (newVal, oldVal) => {
+    const css = document.getElementById("dynamicStyle");
+    if (css == null) return;
+    if ([null, "todo"].includes(newVal)) return css.innerHTML = "";
+    css.innerHTML = `
+    div.film:not(.${newVal}) {
+      display:none !important;
+    }
+    `
   });
 
   FormQuery.form_to_query();

@@ -1,3 +1,5 @@
+*.sqlite
+*.sqlite-journal
 rec/
 out/*
 !out/rec/

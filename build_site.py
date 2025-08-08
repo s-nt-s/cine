@@ -10,6 +10,7 @@ from core.film import Film
 from core.filemanager import FM
 import re
 from datetime import date
+from core.collector import get_films
 
 
 config_log("log/build_site.log")
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 NOW = datetime.now()
 
-films = tuple(Rtve().films)
+films = tuple(get_films())
 films = tuple(sorted(films, key=lambda f: f.publication, reverse=True))
 
 print("Películas:", len(films))
@@ -59,6 +60,20 @@ def get_expiration(fmls: tuple[Film]):
     return exp
 
 
+def _sort_provider(x: str):
+    arr = []
+    arr.append(-int(x.lower() == "rtve"))
+    tp = tuple(x.split(" - "))
+    arr.append(len(tp))
+    arr.append(tp)
+    return tuple(arr)
+
+
+providers: dict[str, int] = {}
+for f in films:
+    providers[f.get_provider()] = providers.get(f.get_provider(), 0) + 1
+providers = dict(sorted(providers.items(), key=lambda kv: _sort_provider(kv[0])))
+
 j = Jnj2(
     "template/",
     "out/",
@@ -73,6 +88,7 @@ j.create_script(
 j.save(
     "index.html",
     fl=films,
+    providers=providers,
     NOW=NOW,
     count=len(films)
 )
