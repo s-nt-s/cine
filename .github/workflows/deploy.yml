@@ -46,12 +46,7 @@ jobs:
       - name: BUILD
         env:
           OMDBAPI_KEY: ${{ secrets.OMDBAPI_KEY }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
           OWNER_MAIL: ${{ secrets.OWNER_MAIL }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         continue-on-error: false
         uses: nick-fields/retry@v2
         with:
