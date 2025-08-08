@@ -1,5 +1,6 @@
 from typing import NamedTuple, Optional
 from core.wiki import WikiUrl
+import re
 
 
 class IMDb(NamedTuple):
@@ -52,8 +53,11 @@ class Film(NamedTuple):
             return "rtve"
         if self.provider is None:
             return self.source
+        pr = str(self.provider)
+        if not re.search(r"\d", pr):
+            pr = pr.title()
         if self.source is None:
-            return self.provider
-        if self.source.lower() == self.provider.lower():
-            return self.provider
-        return f"{self.source} - {self.provider}"
+            return pr
+        if self.source.lower() == pr.lower():
+            return self.source
+        return f"{self.source} - {pr}"

@@ -3,8 +3,9 @@ from core.efilm import EFilm, Video as EFilmVideo
 from core.imdb import IMDB, IMDBInfo
 from core.film import Film, IMDb
 from core.wiki import WIKI
-from core.util import re_or, get_first
+from core.util import re_or, get_first, tp_uniq
 from core.country import to_countries
+from core.genres import fix_genres
 import re
 import logging
 
@@ -30,45 +31,21 @@ def get_films():
         if ko:
             logger.debug(f"{v.url} descartado por {ko}")
             continue
+        imdbId = v.imdb.id if v.imdb else None
         v = complete_film(v)
-        ##v = v._replace(genres=refine_genres(v) or v.genres)
+        v = v._replace(genres=fix_genres(v.genres, imdbId))
         arr.append(v)
     return tuple(arr)
-
-
-def refine_genres(v: Film):
-    if v is None or not v.genres:
-        return None
-    set_g = set(v.genres)
-    if set_g.intersection({"Oeste", "Western"}):
-        return ("Western", )
-    if set_g.intersection({"Comedy", "Comedia"}):
-        return ("Comedia", )
-    if set_g.intersection({"Documental", }):
-        return ("Documental", )
-    if set_g.intersection({"Criminal", }):
-        return ("Suspense", )
-    if "Drama" in v.genres and "Terror" in v.genres:
-        return ("Suspense", )
-    if set_g.intersection({"Acción", "Aventuras"}):
-        return ("Aventuras", )
-    if set_g.intersection({"Romántico", "Romántica"}):
-        return ("Romántica", )
-    if set_g.intersection({"Infantil", }):
-        return ("Infantil", )
-    if set_g.intersection({"Fantasy", }):
-        return ("Fantástico", )
-
-    genres = list(v.genres)
-    for g in ("Clásicos", ):
-        if len(genres) > 1 and g in genres:
-            genres.remove(g)
-    return tuple(genres)
 
 
 def complete_film(v: Film):
     if v is None:
         return v
+    v = v._replace(
+        casting=tp_uniq(v.casting),
+        director=tp_uniq(v.director),
+        genres=tp_uniq(v.genres)
+    )
     if v.imdb is None or v.imdb.id is None:
         logger.debug(f"NO_IMDB {v.url}")
         return v._replace(imdb=None)
@@ -78,11 +55,11 @@ def complete_film(v: Film):
     if not isinstance(x, dict):
         return v
     if not v.casting:
-        v = v._replace(casting=tuple(x.get('Actors', [])))
+        v = v._replace(casting=tp_uniq(x.get('Actors')))
     if not v.director:
-        v = v._replace(director=tuple(x.get('Director', [])))
+        v = v._replace(director=tp_uniq(x.get('Director')))
     if not v.genres:
-        v = v._replace(genres=tuple(x.get('Genre', [])))
+        v = v._replace(genres=tp_uniq(x.get('Genre')))
     return v
 
 

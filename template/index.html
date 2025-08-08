@@ -58,13 +58,15 @@
           <p class="botonera">
             {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
             {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}
-            {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}</p>
+            {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
+            {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}
+          </p>
           <p>
-          {{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
+          {{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%} <span class="povider {{f.get_provider()|simplify}}">{{f.get_provider()}}</span></p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>
-          <p><b>{{f.director|yjoin}}</b>{%if ((f.director|length) > 0) and ((f.casting|length) > 0) %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
+          <p><b>{{f.director|yjoin}}</b>{%if f.casting %} || <span>{{f.casting|yjoin}}</span>{% endif %}</p>
           <p>{{f.description}}</p>
       </div>
       {% endfor %}

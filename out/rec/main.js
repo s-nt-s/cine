@@ -437,7 +437,7 @@ function onChange() {
   ifChange(form, "show", (newVal, oldVal) => {
     const css = document.getElementById("dynamicStyle");
     if (css == null) return;
-    if (newVal == null) return css.innerHTML = "";
+    if ([null, "todo"].includes(newVal)) return css.innerHTML = "";
     css.innerHTML = `
     div.film:not(.${newVal}) {
       display:none !important;
