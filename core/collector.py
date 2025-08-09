@@ -6,6 +6,7 @@ from core.wiki import WIKI
 from core.util import re_or, get_first, tp_uniq
 from core.country import to_countries
 from core.genres import fix_genres
+from collections import defaultdict
 import re
 import logging
 
@@ -35,6 +36,29 @@ def get_films():
         v = complete_film(v)
         v = v._replace(genres=fix_genres(v.genres, imdbId))
         arr.append(v)
+    films: list[Film] = []
+    imdb_film: dict[str, set[Film]] = defaultdict(set)
+    for f in arr:
+        if f.imdb is None:
+            films.append(f)
+        else:
+            imdb_film[f.imdb.id].add(f)
+    for fls in imdb_film.values():
+        if len(fls) == 1:
+            films.append(fls.pop())
+            continue
+        alt = sorted(fls, key=_sort_dup_films)
+        f = alt[0]._replace(alt=tuple(alt[1:]))
+        films.append(f)
+    return tuple(arr)
+
+
+def _sort_dup_films(f: Film):
+    arr = []
+    arr.append(-int(f.provider == "rtve"))
+    arr.append(-int("spa" in f.audio))
+    arr.append(-int("spa" in f.subtitle))
+    arr.append(f.title)
     return tuple(arr)
 
 
@@ -87,7 +111,8 @@ def iter_films():
             url=v.url,
             title=v.title,
             img=img,
-            lang=None,
+            audio=tuple(),
+            subtitle=tuple(),
             country=to_countries(imdb.countries),
             description=v.description,
             year=v.productionDate or imdb.year,
@@ -116,7 +141,8 @@ def iter_films():
             url=v.get_url(),
             title=v.name,
             img=get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
-            lang=v.lang,
+            audio=tuple(v.lang or []),
+            subtitle=tuple(v.subtitle or []),
             country=to_countries(imdb.countries or v.countries),
             description=v.description,
             year=v.year or imdb.year,

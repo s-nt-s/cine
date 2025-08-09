@@ -33,7 +33,8 @@ class Film(NamedTuple):
     url: str
     title: str
     img: str
-    lang: tuple[str, ...]
+    audio: tuple[str, ...]
+    subtitle: tuple[str, ...]
     country: tuple[tuple[str, str], ...]
     description: str
     year: int
@@ -47,6 +48,7 @@ class Film(NamedTuple):
     genres: tuple[str, ...]
     imdb: Optional[IMDb] = None
     provider: str = None
+    alt: tuple["Film", ...] = tuple()
 
     def get_provider(self):
         if self.source.lower() == "rtve":
