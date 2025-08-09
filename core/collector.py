@@ -76,6 +76,8 @@ def complete_film(v: Film):
     if v.imdb is None or v.imdb.id is None:
         logger.debug(f"NO_IMDB {v.url}")
         return v._replace(imdb=None)
+    elif v.filmaffinity is None:
+        logger.debug(f"NO_FILMAFFINITY https://www.imdb.com/es-es/title/{v.imdb.id}")
     if v.casting and v.director and v.genres:
         return v
     x = IMDB.get_from_omdbapi(v.imdb.id, autocomplete=False)
