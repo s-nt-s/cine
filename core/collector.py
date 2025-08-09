@@ -50,7 +50,7 @@ def get_films():
         alt = sorted(fls, key=_sort_dup_films)
         f = alt[0]._replace(alt=tuple(alt[1:]))
         films.append(f)
-    return tuple(arr)
+    return tuple(films)
 
 
 def _sort_dup_films(f: Film):
@@ -58,6 +58,8 @@ def _sort_dup_films(f: Film):
     arr.append(-int(f.provider == "rtve"))
     arr.append(-int("spa" in f.audio))
     arr.append(-int("spa" in f.subtitle))
+    arr.append(-len(f.audio))
+    arr.append(-len(f.subtitle))
     arr.append(f.title)
     return tuple(arr)
 

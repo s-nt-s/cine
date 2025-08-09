@@ -200,7 +200,7 @@ class EFilm:
                 if not isinstance(ln, dict):
                     raise ValueError(ln)
                 lang.append((ln.get('language') or {}).get('code_iso3'))
-                lang.append((ln.get('subtitle') or {}).get('code_iso3'))
+                subt.append((ln.get('subtitle') or {}).get('code_iso3'))
             for ct in (ficha.get('countries') or []):
                 if not isinstance(ct, dict):
                     raise ValueError(ct)
@@ -225,7 +225,7 @@ class EFilm:
                 provider_slug=i.get('provider_slug'),
                 provider=(i.get('provider') or {}).get('name'),
                 gamma=(i.get('gamma') or {}).get('name_show'),
-                lang=_to_tuple(*lang, exclude=('mud','mis')),
+                lang=_to_tuple(*lang, exclude=('mud', 'mis')),
                 subtitle=_to_tuple(*subt, exclude=('mis', )),
                 countries=_to_tuple(*coun),
                 created=ficha.get('created'),
