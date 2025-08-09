@@ -68,7 +68,7 @@ class Video(NamedTuple):
 
     @staticmethod
     def mk_url(id: int, slug: str):
-        return f'https://cinemadrid.efilm.online/audiovisual-detail/{id}/{slug}'
+        return f'https://efilm.online/audiovisual-detail/{id}/{slug}'
 
     def get_url(self):
         return Video.mk_url(self.id, self.slug)
