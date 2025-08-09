@@ -7,6 +7,7 @@ from core.util import re_or, get_first, tp_uniq
 from core.country import to_countries
 from core.genres import fix_genres
 from collections import defaultdict
+from core.filemanager import FM
 import re
 import logging
 
@@ -89,6 +90,21 @@ def complete_film(v: Film):
     return v
 
 
+def get_filmaffinity_cache(name: str) -> dict[int, int]:
+    file = FM.resolve_path(f"cache/filmaffinity/{name}.dct.txt")
+    if not file.is_file():
+        return {}
+    obj = FM.load(file)
+    if not isinstance(obj, dict):
+        return {}
+    r = {}
+    for k, v in obj.items():
+        nums = set(map(int, re.findall(r"\d+", v)))
+        if len(nums) == 1:
+            r[k] = int(nums.pop())
+    return r
+
+
 def iter_films():
     rtve = Rtve().get_videos()
     eflim = EFilm(
@@ -96,6 +112,8 @@ def iter_films():
         min_duration=50
     ).get_videos()
     info_imdb = IMDB.get(*get_imdb(*rtve, *eflim))
+    rtve_filmaffinity = get_filmaffinity_cache("rtve")
+    efilm_filmaffinity = get_filmaffinity_cache("efilm")
     for v in rtve:
         imdb = info_imdb.get(v.idImdb) or IMDBInfo(
             id=v.idImdb,
@@ -127,7 +145,7 @@ def iter_films():
                 votes=imdb.votes
             ),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=imdb.filmaffinity,
+            filmaffinity=rtve_filmaffinity.get(v.id) or imdb.filmaffinity,
             director=v.director,
             casting=v.casting,
             genres=get_rtve_genres(v, imdb),
@@ -157,7 +175,7 @@ def iter_films():
                 votes=imdb.votes
             ),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=imdb.filmaffinity,
+            filmaffinity=efilm_filmaffinity.get(v.id) or imdb.filmaffinity,
             director=v.director,
             casting=v.actors,
             genres=v.genres,
