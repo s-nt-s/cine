@@ -409,6 +409,12 @@ function mkVideo(url, fireByUser) {
     }
     events.forEach(e=>window.addEventListener(e, onFirstUserInteraction));
   }
+  video.addEventListener("ended", async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    }
+    div.remove();
+  });
   return video;
 }
 
