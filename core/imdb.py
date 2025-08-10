@@ -153,7 +153,6 @@ class IMDBApi:
                 awards=dict_walk(data, 'Awards', instanceof=(str, type(None))),
                 typ=dict_walk(data, 'Type', instanceof=(str, type(None))),
                 genres=dict_walk_tuple(data, 'Genre'),
-                img=dict_walk(data, 'Poster', instanceof=(str, type(None))),
                 countries=None,
                 wiki=None,
                 filmaffinity=None,
