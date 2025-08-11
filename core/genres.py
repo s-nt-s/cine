@@ -77,16 +77,16 @@ ORDER = {k: i for i, k in enumerate((
     "oeste",
     "comedia",
     "terror",
-    "acción",
     "romántico",
     "suspense",
     "musical",
-    "drama",
     "bélico",
     "biográfico",
     "histórico",
     "ciencia ficción",
     "fantástico",
+    "acción",
+    "drama",
     "animación",
 ))}
 
@@ -122,7 +122,7 @@ def fix_genres(genres: tuple[str, ...], imdb: str = None):
     nrm.discard("documental")
 
     hasGen: dict[str, bool] = {}
-    for g in ("drama", "infantil"):
+    for g in ("acción", "drama", "infantil"):
         hasGen[g] = (g in nrm) or (g in gnr)
         gnr.discard(g)
         nrm.discard(g)
