@@ -103,7 +103,7 @@ a.wiki_en { background-color: #c7d8f4; border-color: #c7d8f4;}
 
 span.genre {
   display: inline-block;
-  background-color: grey;
+  background-color: #B0B0B0; /* gris neutro para "sin género" */
   color: white;
   font-weight: bold;
   font-family: Arial, sans-serif;
@@ -111,43 +111,52 @@ span.genre {
   border-radius: 0.5em;
   font-size: 0.9em;
 }
-
 span.drama {
-  background-color:blue;
+  background-color: #2B4C7E; /* azul oscuro, serio */
 }
 span.suspense {
-  background-color:black;
+  background-color: #1C1C1C; /* casi negro, tensión */
 }
 span.documental {
-  background-color:grey;
-}
-span.cultura {
-  background-color:orange;
-}
-span.western, span.oeste {
-  background-color:maroon;
+  background-color: #5E6B73; /* gris azulado, neutral y serio */
 }
 span.comedia {
-  background-color:green;
+  background-color: #2CA02C; /* verde brillante, tono alegre */
 }
-span.romantica,span.romantico {
-  background-color:pink;
+span.romantica, span.romantico {
+  background-color: #E75480; /* rosa fuerte, cálido y emocional */
 }
-span.infantil {
-  background-color: burlywood;
+span.western, span.oeste {
+  background-color: #8B4513; /* marrón cuero, estética del oeste */
 }
 span.terror {
-  background-color: red;
+  background-color: #B22222; /* rojo sangre oscuro */
 }
 span.aventuras, span.accion {
-  background-color: blueviolet;
+  background-color: #8A2BE2; /* violeta intenso, energía y dinamismo */
 }
 span.historico {
-  background-color: cadetblue;
+  background-color: #4682B4; /* azul acero, sobrio y tradicional */
 }
 span.musical {
-  background-color: yellowgreen;
+  background-color: #E6C200; /* dorado brillante, espectáculo */
 }
+span.belico {
+  background-color: #C1440E; /* naranja rojizo, intensidad bélica */
+}
+span.biografico {
+  background-color: #CD853F; /* marrón claro, tono humano y cercano */
+}
+span.ciencia-ficcion {
+  background-color: #4169E1; /* azul real, tecnología y futuro */
+}
+span.fantastico {
+  background-color: #9370DB; /* púrpura, imaginario y mágico */
+}
+span.animacion {
+  background-color: #FF8C00; /* naranja vivo, energía y diversión */
+}
+
 abbr.duration {
   white-space: nowrap;
   text-decoration: none;

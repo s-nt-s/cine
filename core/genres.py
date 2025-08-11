@@ -34,6 +34,7 @@ STANDARDIZATION = {
     "slasher": "terror",
     "sport": "deportes",
     "film-noir": "suspense",
+    "spaghetti western": "oeste",
 
     # Español variantes → forma preferida
     "romántica": "romántico",
@@ -51,7 +52,8 @@ STANDARDIZATION = {
     "intriga": "suspense",
     "biografía": "biográfico",
     "fantasía": "fantástico",
-    "familiar": "infantil"
+    "familiar": "infantil",
+    "familia": "infantil"
 }
 
 RM_GENRE = (
@@ -61,13 +63,32 @@ RM_GENRE = (
     'deportes',
     'periodismo',
     'tv movies',
-    'familia',
+    'familiar',
     'cine español',
     'cine europeo',
     'cine internacional',
     'social',
     'cultura'
 )
+
+
+ORDER = {k: i for i, k in enumerate((
+    "documental",
+    "oeste",
+    "comedia",
+    "terror",
+    "acción",
+    "romántico",
+    "suspense",
+    "musical",
+    "drama",
+    "bélico",
+    "biográfico",
+    "histórico",
+    "ciencia ficción",
+    "fantástico",
+    "animación",
+))}
 
 
 def _standarize(*genres: str):
@@ -96,16 +117,23 @@ def fix_genres(genres: tuple[str, ...], imdb: str = None):
     gnr: set[str] = set(_get_from_omdb(imdb))
     nrm: set[str] = set(_standarize(*genres))
 
-    if "documental" in nrm:
-        if len(gnr) == 0 or "documental" in gnr:
-            return ("Documental", )
-        nrm.discard("documental")
+    if ("documental" in nrm and len(gnr) == 0) or "documental" in gnr:
+        return ("Documental", )
+    nrm.discard("documental")
 
     hasGen: dict[str, bool] = {}
     for g in ("drama", "infantil"):
         hasGen[g] = (g in nrm) or (g in gnr)
         gnr.discard(g)
         nrm.discard(g)
+
+    for k, dup in {
+        "biográfico": ("histórico", )
+    }.items():
+        if k in nrm:
+            nrm = nrm.difference(dup)
+        if k in gnr:
+            gnr = gnr.difference(dup)
 
     if len(nrm) == 0:
         nrm = gnr
@@ -116,4 +144,5 @@ def fix_genres(genres: tuple[str, ...], imdb: str = None):
             if b is True:
                 return (k.capitalize(), )
 
-    return tuple(sorted(map(str.capitalize, nrm)))
+    genres = sorted(nrm, key=lambda g: (ORDER.get(g, len(ORDER)), g))
+    return tuple(map(str.capitalize, genres))

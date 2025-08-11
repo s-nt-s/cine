@@ -10,9 +10,10 @@ from collections import defaultdict
 from core.filemanager import FM
 import re
 import logging
+from datetime import date
 
 logger = logging.getLogger(__name__)
-
+TODAY = date.today()
 
 def get_imdb(*args: RtveVideo | EFilmVideo):
     ids: set[str] = set()
@@ -73,6 +74,9 @@ def complete_film(v: Film):
         director=tp_uniq(v.director),
         genres=tp_uniq(v.genres)
     )
+    if v.expiration and date(*map(int, re.findall(r"\d+", v.expiration)[:3])) < TODAY:
+        logger.debug(f"{v.expiration} eliminada por incongruente, {v.url}")
+        v = v._replace(expiration=None)
     if v.imdb is None or v.imdb.id is None:
         logger.debug(f"NO_IMDB {v.url}")
         return v._replace(imdb=None)

@@ -95,4 +95,10 @@ j.save(
 
 FM.dump("out/films.json", films)
 
+gens: dict[tuple[str, ...], int] = {}
+for f in films:
+    gens[f.genres] = gens.get(f.genres, 0) + 1 
+for g, c in sorted(gens.items(), key=lambda kv: (-kv[1], len(kv[0]), kv[0])):
+    logger.info(f"{c} {g}")
+
 print("Fin")
