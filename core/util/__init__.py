@@ -592,3 +592,9 @@ def iter_chunk(size: int, args: list):
             arr = []
     if arr:
         yield arr
+
+
+def safe_index(lst: list[T] | tuple[T, ...], value: T, default: int) -> int:
+    if value in lst:
+        return lst.index(value)
+    return default

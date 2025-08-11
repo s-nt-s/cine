@@ -1,4 +1,5 @@
 from core.imdb import IMDB
+from core.util import safe_index
 from functools import cache
 import logging
 import re
@@ -72,7 +73,7 @@ RM_GENRE = (
 )
 
 
-ORDER = {k: i for i, k in enumerate((
+ORDER = (
     "documental",
     "oeste",
     "comedia",
@@ -88,7 +89,7 @@ ORDER = {k: i for i, k in enumerate((
     "acción",
     "drama",
     "animación",
-))}
+)
 
 
 def _standarize(*genres: str):
@@ -130,10 +131,9 @@ def fix_genres(genres: tuple[str, ...], imdb: str = None):
     for k, dup in {
         "biográfico": ("histórico", )
     }.items():
-        if k in nrm:
-            nrm = nrm.difference(dup)
-        if k in gnr:
-            gnr = gnr.difference(dup)
+        for st in (nrm, gnr):
+            if k in st:
+                st.difference_update(dup)
 
     if len(nrm) == 0:
         nrm = gnr
@@ -144,5 +144,6 @@ def fix_genres(genres: tuple[str, ...], imdb: str = None):
             if b is True:
                 return (k.capitalize(), )
 
-    genres = sorted(nrm, key=lambda g: (ORDER.get(g, len(ORDER)), g))
+    def_index = len(ORDER)
+    genres = sorted(nrm, key=lambda g: (safe_index(ORDER, g, def_index), g))
     return tuple(map(str.capitalize, genres))
