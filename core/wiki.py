@@ -393,8 +393,8 @@ class WikiApi:
             if v is None or (isinstance(v, str) and len(v) == 0):
                 continue
             obj[k].add(v)
-        obj = {k: v.pop() for k, v in obj.items() if len(v) == 1}
-        return obj
+        rtn = {k: v.pop() for k, v in obj.items() if len(v) == 1}
+        return rtn
 
     @cache
     def get_label(self, field: str, value: str, lang: str) -> str | None:
@@ -419,7 +419,7 @@ class WikiApi:
         if url is None:
             return None
         lang = url.split("://", 1)[-1].split(".", 1)[0]
-        label = self.get_label("wdt:P424", lang, "es,en")
+        label = self.get_label("wdt:P218", lang, "es,en")
         return WikiUrl(
             url=url,
             lang_code=lang,
@@ -428,3 +428,9 @@ class WikiApi:
 
 
 WIKI = WikiApi()
+
+
+if __name__ == "__main__":
+    import sys
+    print(WIKI.parse_url(sys.argv[1]))
+    print(WIKI.last_query)
