@@ -195,6 +195,18 @@ class WikiApi:
                 r[k] = tuple(sorted(v))
         return r
 
+    def get_genres(self, *args):
+        r: dict[str, tuple[str, ...]] = dict()
+        for k, v in self.get_dict(
+            *args,
+            key_field='wdt:P345',
+            val_field='wdt:P136',
+            lang='es,en'
+        ).items():
+            if len(v):
+                r[k] = tuple(sorted(v))
+        return r
+
     def get_names(self, *args: str) -> dict[str, str]:
         obj = {}
         for k, v in self.get_label_dict(*args, key_field='wdt:P345').items():
@@ -267,7 +279,7 @@ class WikiApi:
 
     @cache
     @retry_fetch(chunk_size=300)
-    def get_dict(self, *args, key_field: str = None, val_field: str = None, by_field: str = None) -> dict[str, list[str | int]]:
+    def get_dict(self, *args, key_field: str = None, val_field: str = None, by_field: str = None, lang: str = None) -> dict[str, list[str | int]]:
         if len(args) == 0:
             return {}
         ids = " ".join(map(lambda x: f'"{x}"', args))
@@ -278,31 +290,35 @@ class WikiApi:
                     ?item %s ?k ;
                           %s ?b .
                        ?b %s ?v .
-                }
             ''').strip() % (
                 ids,
                 key_field,
                 by_field,
                 val_field,
             )
+            if lang:
+                query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
+                query = query + f'\n      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
+            query = query + "\n}"
         else:
             query = dedent('''
                 SELECT ?k ?v WHERE {
                     VALUES ?k { %s }
                     ?item %s ?k.
                     ?item %s ?v.
-                }
             ''').strip() % (
                 ids,
                 key_field,
                 val_field,
             )
+            if lang:
+                query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
+                query = query + f'\n    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
+            query = query + "\n}"
         r = defaultdict(set)
         for i in self.query(query):
             k = i['k']['value']
-            v = i.get('v', {}).get('value')
-            if isinstance(v, str):
-                v = v.strip()
+            v = i.get('vLabel' if lang else 'v', {}).get('value')
             if v is None or (isinstance(v, str) and len(v) == 0):
                 continue
             if v.isdigit():
@@ -431,6 +447,11 @@ WIKI = WikiApi()
 
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     import sys
-    print(WIKI.parse_url(sys.argv[1]))
-    print(WIKI.last_query)
+    gen: set[str] = set()
+    for k, v in WIKI.get_genres(*sys.argv[1:]).items():
+        #print(k, *v)
+        gen = gen.union(v)
+    print(*sorted(gen), sep="\n")
