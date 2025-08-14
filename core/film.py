@@ -56,8 +56,10 @@ class Film(NamedTuple):
         if self.provider is None:
             return self.source
         pr = str(self.provider)
-        if not re.search(r"\d", pr):
-            pr = pr.title()
+        if not re.search(r"\d", pr) and pr not in ("MSP", "NYX"):
+            pr = pr.title().replace(" Un ", " un ")
+        if pr == "Zonaa":
+            pr = "Zona A"
         if self.source is None:
             return pr
         if self.source.lower() == pr.lower():
