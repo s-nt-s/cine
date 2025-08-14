@@ -109,7 +109,7 @@ class EFilm:
         logger.debug(url)
         while True:
             r = self.__s.get(url)
-            if max_tries > 0 and r.status_code == 500:
+            if max_tries > 0 and r.status_code in (500, 502):
                 max_tries = max_tries - 1
                 time.sleep(30)
                 continue
