@@ -111,11 +111,15 @@ class EFilm:
             r = self.__s.get(url)
             if max_tries > 0 and r.status_code == 500:
                 max_tries = max_tries - 1
-                time.sleep(5)
+                time.sleep(30)
                 continue
             try:
                 return r.json()
             except (DecoderJSONDecodeError, RequestsJSONDecodeError):
+                if max_tries > 0:
+                    max_tries = max_tries - 1
+                    time.sleep(30)
+                    continue
                 logger.critical(f"{r.status_code} {url}")
                 raise
 
