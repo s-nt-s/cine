@@ -228,8 +228,8 @@ class EFilm:
                 lang=_to_tuple(*lang, exclude=('mud', 'mis')),
                 subtitle=_to_tuple(*subt, exclude=('mis', )),
                 countries=_to_tuple(*coun),
-                created=ficha.get('created'),
-                expire=ficha.get('expire'),
+                created=_g_date(ficha.get('created')),
+                expire=_g_date(ficha.get('expire')),
                 imdb=self.__cache.get(i['id'])
             )
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
@@ -248,7 +248,6 @@ class EFilm:
 
 if __name__ == "__main__":
     from core.log import config_log
-    from core.filemanager import FM
     config_log("log/efilm.log")
     e = EFilm()
     for v in e.get_videos():

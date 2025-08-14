@@ -92,14 +92,14 @@ ORDER = (
 )
 
 
-def _standarize(*genres: str):
+def _standarize(*genres: str, url: str = None) -> tuple[str, ...]:
     known = set(RM_GENRE).union(STANDARDIZATION.keys()).union(STANDARDIZATION.values())
     arr: list[str] = []
     for g in genres:
         g = re_sp.sub(" ", g).strip().lower()
         g = STANDARDIZATION.get(g, g)
         if g not in known:
-            logger.warning(f"Genero desconocido {g}")
+            logger.warning(f"Genero desconocido {g} en {url}")
         if g not in RM_GENRE and g not in arr:
             arr.append(g)
     return tuple(arr)
@@ -107,16 +107,18 @@ def _standarize(*genres: str):
 
 @cache
 def _get_from_omdb(imdb: str):
-    obj = IMDB.get_from_omdbapi(imdb, autocomplete=False) or {}
+    obj = IMDB.get_from_omdbapi(imdb, autocomplete=False)
+    if not isinstance(obj, dict):
+        return tuple()
     gnr = obj.get('Genre') or []
-    gnr = _standarize(*gnr)
-    gnr = set(_standarize(*gnr)).intersection(STANDARDIZATION.values())
+    gnr = _standarize(*gnr, url=f"https://www.imdb.com/es-es/title/{imdb}")
+    gnr = set(gnr).intersection(STANDARDIZATION.values())
     return tuple(sorted(gnr))
 
 
-def fix_genres(genres: tuple[str, ...], imdb: str = None):
+def fix_genres(genres: tuple[str, ...], imdb: str = None, url: str = None):
     gnr: set[str] = set(_get_from_omdb(imdb))
-    nrm: set[str] = set(_standarize(*genres))
+    nrm: set[str] = set(_standarize(*genres, url=url))
 
     if ("documental" in nrm and len(gnr) == 0) or "documental" in gnr:
         return ("Documental", )

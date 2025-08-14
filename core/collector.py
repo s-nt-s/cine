@@ -36,7 +36,7 @@ def get_films():
             continue
         imdbId = v.imdb.id if v.imdb else None
         v = complete_film(v)
-        v = v._replace(genres=fix_genres(v.genres, imdbId))
+        v = v._replace(genres=fix_genres(v.genres, imdbId, v.url))
         arr.append(v)
     films: list[Film] = []
     imdb_film: dict[str, set[Film]] = defaultdict(set)

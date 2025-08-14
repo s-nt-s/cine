@@ -75,10 +75,10 @@ class IMDBApi:
 
     @cache
     @DictCache(
-        "out/ombd/{}.json",
+        "out/omdb/{}.json",
         mirror=(
-            "https://s-nt-s.github.io/imdb-sql/ombd/",
-            f"{G.page}/ombd/"
+            "https://s-nt-s.github.io/imdb-sql/omdb/",
+            f"{G.page}/omdb/"
         ),
         maxOld=90
     )

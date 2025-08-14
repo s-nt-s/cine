@@ -239,12 +239,14 @@ function ifLocal() {
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
     if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href, 1)}.json`));
-    if (imdb) p.append(" ", mkA(`../omdb/${gId(imdb.href, 1)}.json`));
+    if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
   })
-  document.querySelectorAll("div.film.eflim").forEach(i=>{
+  document.querySelectorAll("div.film.eFilm").forEach(i=>{
     const p = i.querySelector("p");
-    const tit = i.querySelector("a.title");
-    tit.append(" ", mkA(`../../rec/efilm/ficha/${gId(tit.href, 2)}.json`));
+    const imdb = i.querySelector("a.imdb");
+    const efilm = i.querySelector("a.title");
+    if (efilm) p.append(" ", mkA(`../rec/efilm/ficha/${gId(efilm.href, 2)}.json`));
+    if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
   })
 }
 
