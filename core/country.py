@@ -82,6 +82,8 @@ def search_country(name: str):
 
 
 def to_country(s: str) -> Country:
+    if s == "NED":
+        return to_country("NLD")
     if s == "West Germany":
         return to_country("Germany")._replace(
             eng=s,
