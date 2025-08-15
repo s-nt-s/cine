@@ -30,12 +30,12 @@ def sort_ids(fnc: Callable[[Film], Any], reverse=False):
 
 
 print("Generando web")
-order = dict()
+order: dict[str, tuple[str, ...]] = dict()
 order['publicacion'] = sort_ids(lambda f: f.publication or '', reverse=True)
 order['expiracion'] = sort_ids(lambda f: (int(f.expiration is None), f.expiration or ''))
 order['duracion'] = sort_ids(lambda f: f.duration or 0)
 order['estreno'] = sort_ids(lambda f: f.year or 0, reverse=True)
-order['genero'] = sort_ids(lambda f: f.genres)
+#order['genero'] = sort_ids(lambda f: f.genres)
 order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
 order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate if f.imdb and f.imdb.rate else -1), 0 if f.imdb else 1))
@@ -73,6 +73,11 @@ providers: dict[str, int] = {}
 for f in films:
     providers[f.get_provider()] = providers.get(f.get_provider(), 0) + 1
 providers = dict(sorted(providers.items(), key=lambda kv: _sort_provider(kv[0])))
+genres: dict[tuple[str, ...], int] = {}
+for f in films:
+    for g in f.genres:
+        genres[g] = genres.get(g, 0) + 1
+
 
 j = Jnj2(
     "template/",
@@ -89,16 +94,12 @@ j.save(
     "index.html",
     fl=films,
     providers=providers,
+    genres=genres,
     NOW=NOW,
     count=len(films)
 )
 
 FM.dump("out/films.json", films)
 
-gens: dict[tuple[str, ...], int] = {}
-for f in films:
-    gens[f.genres] = gens.get(f.genres, 0) + 1 
-for g, c in sorted(gens.items(), key=lambda kv: (-kv[1], len(kv[0]), kv[0])):
-    logger.info(f"{c} {g}")
 
 print("Fin")
