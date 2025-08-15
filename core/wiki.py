@@ -1,6 +1,6 @@
 from textwrap import dedent
 import logging
-from typing import Any, NamedTuple
+from typing import Any
 from functools import cache
 import re
 from time import sleep
@@ -8,11 +8,10 @@ from functools import wraps
 from core.git import G
 from core.req import R
 from collections import defaultdict
-from urllib.parse import urlencode
 from datetime import datetime, timedelta
 from core.util import iter_chunk
 from urllib.error import HTTPError
-
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
@@ -116,7 +115,7 @@ def retry_fetch(chunk_size=5000):
 
             logger.info(f"{_log_line(args, kwargs, chunk_size)} = {len(result)} items")
             for c, q in error_query.items():
-                logger.debug(f"STATUS_CODE {c} for:\n{q}")
+                logger.warning(f"STATUS_CODE {c} for:\n{q}")
             return result
 
         return wrapper
@@ -128,8 +127,9 @@ class WikiApi:
         # https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy
         self.__headers = {
             'User-Agent': f'ImdbBoot/0.0 ({G.remote}; {G.mail})',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            "Accept": "application/sparql-results+json"
+            #'Content-Type': 'application/x-www-form-urlencoded',
+            "Accept": "application/sparql-results+json",
+            'Content-Type': 'application/sparql-query'
         }
         self.__last_query: str | None = None
 
@@ -142,13 +142,11 @@ class WikiApi:
         query = dedent(query).strip()
         query = re.sub(r"\n(\s*\n)+", "\n", query)
         self.__last_query = query
-        query = re_sp.sub(" ", query)
-        data = urlencode({"query": query}).encode('utf-8')
         try:
             return R.get_json(
                 "https://query.wikidata.org/sparql",
                 headers=self.__headers,
-                data=data,
+                data=self.__last_query.encode('utf-8'),
                 wait_if_status={429: 60}
             )
         except Exception as e:
@@ -230,7 +228,7 @@ class WikiApi:
 
         lang_case = " ".join(
             f'IF(LANG(?v) = "{lg}", {p},' for lg, p in lang_priority.items()
-        ) + f"{(len(lang_priority) + 1)})" * len(lang_priority)
+        ) + f"{(len(lang_priority) + 1)})" + (')'* (len(lang_priority)-1))
 
         query = dedent("""
             SELECT ?k ?v WHERE {
@@ -328,16 +326,109 @@ class WikiApi:
         return r
 
     @cache
-    @retry_fetch(chunk_size=300)
     def get_countries(self, *args: str) -> dict[str, str]:
-        r = defaultdict(set)
+        obj: dict[str, str] = {}
+        main = self.__get_main_countries(*args)
+        prod = self.__get_prod_countries(*args)
+        peop = self.__get_people_countries(*args)
+        for imdb in args:
+            mn = main.get(imdb, tuple())
+            pr = tuple(prod.get(imdb, {}).keys())
+            pp = tuple(peop.get(imdb, {}).keys())
+            countries = set(mn).intersection(pr).intersection(pp)
+            if len(countries) == 0:
+                countries = set(mn).intersection(pp)
+            if len(countries) == 0:
+                countries = set(mn).intersection(pr)
+            if len(countries) == 0:
+                countries = set(mn)
+            if len(countries) == 0:
+                continue
+            count: dict[str, int] = {}
+            for c in countries:
+                count[c] = (peop.get(imdb, {}).get(c, 0), prod.get(imdb, {}).get(c, 0))
+            ordered = sorted(set(count.values()), reverse=True)
+            threshold = ordered[min(len(ordered)-1, 1)]
+            ok: list[str] = []
+            for c, ct in count.items():
+                if ct <= threshold:
+                    ok.append(c)
+            obj[imdb] = " ".join(ok)
+        return obj
+
+    @retry_fetch(chunk_size=150)
+    def __get_prod_countries(self, *args: str) -> dict[str, dict[str, int]]:
+        r = defaultdict(dict)
+        ids = " ".join(f'"{x}"' for x in args)
+        query = """
+        SELECT ?imdb (COALESCE(?alpha3_current, ?alpha3_hist, ?alpha3_geonames) AS ?alpha3) WHERE {
+            VALUES ?imdb { %s }
+            ?film wdt:P345 ?imdb .
+            ?film wdt:P272 ?prodCompany .
+            ?prodCompany wdt:P17 ?prodCountry .
+            OPTIONAL { ?prodCountry wdt:P298 ?alpha3_current }
+            OPTIONAL { ?prodCountry wdt:P984 ?alpha3_hist }
+            OPTIONAL { ?prodCountry wdt:P11897 ?alpha3_geonames }
+        }
+        """ % ids
+        for row in self.query(query):
+            imdb = row["imdb"]["value"]
+            alpha3 = row.get("alpha3", {}).get("value")
+            if alpha3:
+                r[imdb][alpha3] = r[imdb].get(alpha3, 0) + 1
+        return dict(r)
+
+    @retry_fetch(chunk_size=150)
+    def __get_people_countries(self, *args: str) -> dict[str, dict[str, int]]:
+        r = defaultdict(dict)
         ids = " ".join(f'"{x}"' for x in args)
         query = """
         SELECT ?imdb ?alpha3 WHERE {
             VALUES ?imdb { %s }
+
+            ?film wdt:P345 ?imdb .
+
+            # Director
+            OPTIONAL {
+                ?film wdt:P57 ?person1 .
+                ?person1 wdt:P27 ?country1 .
+                ?country1 wdt:P298 ?alpha3 .
+            }
+
+            # Guionista
+            OPTIONAL {
+                ?film wdt:P58 ?person2 .
+                ?person2 wdt:P27 ?country2 .
+                ?country2 wdt:P298 ?alpha3 .
+            }
+
+            # Actor principal
+            OPTIONAL {
+                ?film wdt:P161 ?person3 .
+                ?person3 wdt:P27 ?country3 .
+                ?country3 wdt:P298 ?alpha3 .
+            }
+        }
+        """ % ids
+        for row in self.query(query):
+            imdb = row["imdb"]["value"]
+            alpha3 = row.get("alpha3", {}).get("value")
+            if alpha3:
+                r[imdb][alpha3] = r[imdb].get(alpha3, 0) + 1
+        return dict(r)
+
+    @retry_fetch(chunk_size=150)
+    def __get_main_countries(self, *args: str) -> dict[str, tuple[str, ...]]:
+        r = defaultdict(set)
+        ids = " ".join(f'"{x}"' for x in args)
+        query = """
+        SELECT ?imdb (COALESCE(?alpha3_current, ?alpha3_hist, ?alpha3_geonames) AS ?alpha3) WHERE {
+            VALUES ?imdb { %s }
             ?item wdt:P345 ?imdb ;
                 wdt:P495 ?country .
-            ?country wdt:P298 ?alpha3 .
+                OPTIONAL { ?country wdt:P298 ?alpha3_current }
+                OPTIONAL { ?country wdt:P984 ?alpha3_hist }
+                OPTIONAL { ?country wdt:P11897 ?alpha3_geonames }
         }
         """ % ids
         for row in self.query(query):
@@ -348,7 +439,7 @@ class WikiApi:
         obj: dict[str, str] = dict()
         for k, v in r.items():
             if v:
-                obj[k] = " ".join(sorted(v))
+                obj[k] = tuple(sorted(v))
         return obj
 
     @cache
@@ -409,8 +500,8 @@ class WikiApi:
             if v is None or (isinstance(v, str) and len(v) == 0):
                 continue
             obj[k].add(v)
-        rtn = {k: v.pop() for k, v in obj.items() if len(v) == 1}
-        return rtn
+        obj = {k: v.pop() for k, v in obj.items() if len(v) == 1}
+        return obj
 
     @cache
     def get_label(self, field: str, value: str, lang: str) -> str | None:

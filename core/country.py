@@ -19,14 +19,27 @@ class Country(NamedTuple):
     def to_html(self):
         if self.ico:
             return f'<abbr class="pais pais_{self.cod}" title="{self.spa}">{self.ico}</abbr>'
-        return f'<img class="pais pais_{self.cod}" title="{self.spa}" src="https://flagcdn.com/{self.cod}.svg"/>'
+        return f'<img class="pais pais_{self.cod}" title="{self.spa}" src="{self.url_ico}"/>'
+
+    @property
+    def url_ico(self):
+        if self.alpha_3 == "YUG":
+            return "https://upload.wikimedia.org/wikipedia/commons/6/61/Flag_of_Yugoslavia_%281946-1992%29.svg"
+        return f"https://flagcdn.com/{self.cod}.svg"
 
     def _fix(self):
         slf = self
-        if slf.spa.startswith("RAE de "):
-            slf = slf._replace(spa=slf.spa[7:].strip())
-        if slf.spa == "Territorios Palestinos":
-            slf = slf._replace(spa="Palestina")
+        if slf.spa:
+            if slf.spa.startswith("RAE de "):
+                slf = slf._replace(spa=slf.spa[7:].strip())
+            if slf.spa == "Territorios Palestinos":
+                slf = slf._replace(spa="Palestina")
+        elif slf.alpha_3 == "SCG":
+            slf = slf._replace(spa="Serbia y Montenegro")
+        elif slf.alpha_3 == "YUG":
+            slf = slf._replace(spa="Yugoslavia")
+        else:
+            logger.warning(f"País sin nombre: {slf}")
         return slf
 
 
