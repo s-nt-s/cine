@@ -1,5 +1,6 @@
 from typing import NamedTuple, Optional
 from core.wiki import WikiUrl
+from core.country import Country
 import re
 
 
@@ -35,7 +36,7 @@ class Film(NamedTuple):
     img: str
     audio: tuple[str, ...]
     subtitle: tuple[str, ...]
-    country: tuple[tuple[str, str], ...]
+    country: tuple[Country, ...]
     description: str
     year: int
     expiration: str

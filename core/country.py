@@ -21,6 +21,14 @@ class Country(NamedTuple):
             return f'<abbr class="pais pais_{self.cod}" title="{self.spa}">{self.ico}</abbr>'
         return f'<img class="pais pais_{self.cod}" title="{self.spa}" src="https://flagcdn.com/{self.cod}.svg"/>'
 
+    def _fix(self):
+        slf = self
+        if slf.spa.startswith("RAE de "):
+            slf = slf._replace(spa=slf.spa[7:].strip())
+        if slf.spa == "Territorios Palestinos":
+            slf = slf._replace(spa="Palestina")
+        return slf
+
 
 def search_country(name: str):
     if name in (None, '', 'N/A'):
@@ -65,14 +73,14 @@ def to_country(s: str) -> Country:
         return to_country("Germany")._replace(
             eng=s,
             spa="Alemania Occidental"
-        )
+        )._fix()
     if s in ("SUN", "Soviet Union", "Unión soviética", "URSS"):
         return Country(
             cod="SUN",
             spa="Unión soviética",
             eng="Soviet Union",
             ico="🇨🇳"
-        )
+        )._fix()
     c = search_country(name=s)
     if c is None:
         raise ValueError(f"País no encontrado: {s}")
@@ -85,7 +93,7 @@ def to_country(s: str) -> Country:
         eng=get_first(*map(lambda x: getattr(c, x, None), ('name', "common_name", "official_name"))),
         ico=getattr(c, "flag", None),
         alpha_3=alpha_3,
-    )
+    )._fix()
 
 
 def _to_alpha_3(s: str):

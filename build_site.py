@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from core.rtve import Rtve
 from core.log import config_log
 from core.j2 import Jnj2
 import logging
@@ -11,6 +10,7 @@ from core.filemanager import FM
 import re
 from datetime import date
 from core.collector import get_films
+from core.country import Country
 
 
 config_log("log/build_site.log")
@@ -73,10 +73,16 @@ providers: dict[str, int] = {}
 for f in films:
     providers[f.get_provider()] = providers.get(f.get_provider(), 0) + 1
 providers = dict(sorted(providers.items(), key=lambda kv: _sort_provider(kv[0])))
-genres: dict[tuple[str, ...], int] = {}
+genres: dict[str, int] = {}
 for f in films:
     for g in f.genres:
         genres[g] = genres.get(g, 0) + 1
+genres = dict(sorted(genres.items()))
+countries: dict[Country, int] = {}
+for f in films:
+    for c in f.country:
+        countries[c] = countries.get(c, 0) + 1
+countries = dict(sorted(countries.items(), key=lambda kv: kv[0].spa))
 
 
 j = Jnj2(
@@ -95,6 +101,7 @@ j.save(
     fl=films,
     providers=providers,
     genres=genres,
+    countries=countries,
     NOW=NOW,
     count=len(films)
 )
