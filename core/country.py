@@ -60,6 +60,7 @@ class Country(NamedTuple):
             "FRG": "🇩🇪",
             "DDR": "🇩🇪",
             "SUN": "🇨🇳",
+            "CSK": "🇨🇿"
         }.get(slf.alpha_3)
         if spa:
             slf = slf._replace(spa=spa)
@@ -113,7 +114,7 @@ class CountryFinder:
             if c is not None and c.alpha_2:
                 return c.alpha_2
         return None
-    
+
     def parse_alpha3(self, cod: str, silent: bool = False) -> str | None:
         if cod in (None, '', 'N/A'):
             return None
