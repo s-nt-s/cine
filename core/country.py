@@ -26,8 +26,8 @@ CUSTOM_ALIASES = {
 
 
 class Country(NamedTuple):
-    spa: str
     alpha_3: str
+    spa: str = None
     eng: str = None
     ico: str = None
 
@@ -46,26 +46,29 @@ class Country(NamedTuple):
 
     def _fix(self):
         slf = self
-        if slf.spa:
-            if slf.spa.startswith("RAE de "):
-                slf = slf._replace(spa=slf.spa[7:].strip())
-            if slf.spa == "Territorios Palestinos":
-                slf = slf._replace(spa="Palestina")
-        elif slf.alpha_3 == "SCG":
-            slf = slf._replace(spa="Serbia y Montenegro")
-        elif slf.alpha_3 == "YUG":
-            slf = slf._replace(spa="Yugoslavia")
-        elif slf.alpha_3 == "SUN":
-            slf = slf._replace(spa="Unión Soviética")
-        else:
+        spa = {
+            "FRG": "Alemania del Oeste",
+            "DDR": "Alemania del Este",
+            "SUN": "Unión Soviética",
+            "PSE": "Palestina",
+            "YUG": "Yugoslavia",
+            "SCG": "Serbia y Montenegro"
+        }.get(slf.alpha_3)
+        ico = {
+            "FRG": "🇩🇪",
+            "DDR": "🇩🇪",
+            "SUN": "🇨🇳",
+        }.get(slf.alpha_3)
+        if spa:
+            slf = slf._replace(spa=spa)
+        elif slf.spa is None:
             logger.warning(f"País sin nombre: {slf}")
-        if slf.ico is None:
-            if slf.alpha_3 == "SUN":
-                slf = slf._replace(ico="🇨🇳")
-            elif slf.alpha_3 == "FRG":
-                slf = slf._replace(ico="🇩🇪")
-            elif slf.url_ico is None:
-                logger.critical(f"País sin icono ni URL: {slf}")
+        elif slf.spa.startswith("RAE de "):
+            slf = slf._replace(spa=slf.spa[7:].strip())
+        if ico:
+            slf = slf._replace(ico=ico)
+        elif slf.ico is None and slf.url_ico is None:
+            logger.critical(f"País sin icono ni URL: {slf}")
         return slf
 
 
@@ -189,13 +192,11 @@ class CountryFinder:
             raise ValueError(f"Código país no válido: {alpha3}")
         if alpha3 == "SUN":
             return Country(
-                spa="Unión soviética",
                 eng="Soviet Union",
                 alpha_3=alpha3,
             )._fix()
         if alpha3 == "FRG":
             return Country(
-                spa="Alemania Occidental",
                 eng="West Germany",
                 alpha_3=alpha3,
             )._fix()
