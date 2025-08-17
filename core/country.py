@@ -60,7 +60,7 @@ class Country(NamedTuple):
         ico = {
             "FRG": "🇩🇪",
             "DDR": "🇩🇪",
-            "SUN": "🇨🇳",
+            "SUN": "☭",
             "CSK": "🇨🇿"
         }.get(slf.alpha_3)
         if spa:
