@@ -34,14 +34,18 @@ class Country(NamedTuple):
     ico: str = None
 
     def to_html(self):
-        if self.ico:
+        if self.ico not in (None, '☭', '★'):
             return f'<abbr class="pais pais_{self.alpha_3}" title="{self.spa}">{self.ico}</abbr>'
         return f'<img class="pais pais_{self.alpha_3}" title="{self.spa}" src="{self.url_ico}"/>'
 
     @property
     def url_ico(self):
-        if self.alpha_3 == "YUG":
-            return "https://upload.wikimedia.org/wikipedia/commons/6/61/Flag_of_Yugoslavia_%281946-1992%29.svg"
+        url = {
+            "YUG": "https://upload.wikimedia.org/wikipedia/commons/6/61/Flag_of_Yugoslavia_%281946-1992%29.svg",
+            "SUN": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
+        }.get(self.alpha_3)
+        if url:
+            return url
         alpha_2 = CF.alpha3_to_alpha2(self.alpha_3)
         if alpha_2:
             return f"https://flagcdn.com/{alpha_2}.svg"
@@ -60,8 +64,9 @@ class Country(NamedTuple):
         ico = {
             "FRG": "🇩🇪",
             "DDR": "🇩🇪",
+            "CSK": "🇨🇿",
             "SUN": "☭",
-            "CSK": "🇨🇿"
+            "YUG": "★",
         }.get(slf.alpha_3)
         if spa:
             slf = slf._replace(spa=spa)
