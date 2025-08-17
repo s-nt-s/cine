@@ -64,10 +64,8 @@ class Country(NamedTuple):
                 slf = slf._replace(ico="🇨🇳")
             elif slf.alpha_3 == "FRG":
                 slf = slf._replace(ico="🇩🇪")
-            else:
-                logger.warning(f"País sin icono: {slf}")
-                if slf.url_ico is None:
-                    logger.critical(f"País sin icono ni URL: {slf}")
+            elif slf.url_ico is None:
+                logger.critical(f"País sin icono ni URL: {slf}")
         return slf
 
 
