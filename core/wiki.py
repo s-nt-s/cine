@@ -1,6 +1,6 @@
 from textwrap import dedent
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 from functools import cache
 import re
 from time import sleep
@@ -11,7 +11,9 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from core.util import iter_chunk
 from urllib.error import HTTPError
-from typing import NamedTuple
+from core.country import CF
+import json
+
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
@@ -39,6 +41,19 @@ class WikiUrl(NamedTuple):
         html += '>W</a>'
         return html
 
+def _parse_wiki_val(s: str):
+    if not isinstance(s, str):
+        return s
+    s = s.strip()
+    if len(s) == 0:
+        return None
+    if s.startswith("http://www.wikidata.org/.well-known/genid/"):
+        return None
+    m = re.match(r"https?://www\.wikidata\.org/entity/(Q\d+)", s)
+    if m:
+        return f"wd:{m.group(1)}"
+    return s
+
 
 class WikiError(Exception):
     def __init__(self, msg: str, query: str, http_code: int):
@@ -62,12 +77,20 @@ class WikiError(Exception):
 
 def retry_fetch(chunk_size=5000):
     def decorator(func):
+        internal_cache: dict[tuple[str, str], Any] = {}
 
         @wraps(func)
         def wrapper(self: "WikiApi", *args, **kwargs):
-            if len(args) == 0:
+            undone = set(args).difference({None, ''})
+            if len(undone) == 0:
                 return {}
-            args = sorted(set(args))
+            key_cache = json.dumps((func.__name__, kwargs), sort_keys=True)
+            result = dict()
+            for a in undone:
+                val = internal_cache.get((key_cache, a))
+                if val is not None:
+                    result[a] = val
+                    undone.discard(a)
 
             def _log_line(rgs: tuple, kw: dict, ck: int):
                 rgs = sorted(set(rgs))
@@ -79,20 +102,18 @@ def retry_fetch(chunk_size=5000):
                 return f"{func.__name__}({line})"
 
             error_query = {}
-            result = dict()
-            ko = set(args)
             count = 0
             tries = 0
             until = datetime.now() + timedelta(seconds=60*5)
             cur_chunk_size = int(chunk_size)
-            while ko and (tries == 0 or (datetime.now() < until and tries < 3)):
+            while undone and (tries == 0 or (datetime.now() < until and tries < 3)):
                 error_query = {}
                 tries = tries + 1
                 if tries > 1:
-                    cur_chunk_size = max(1, min(cur_chunk_size, len(ko)) // 3)
+                    cur_chunk_size = max(1, min(cur_chunk_size, len(undone)) // 3)
                     sleep(5)
-                logger.info(_log_line(ko, kwargs, cur_chunk_size))
-                for chunk in iter_chunk(cur_chunk_size, list(ko)):
+                logger.info(_log_line(undone, kwargs, cur_chunk_size))
+                for chunk in iter_chunk(cur_chunk_size, list(undone)):
                     count += 1
                     fetched: dict = None
                     try:
@@ -109,8 +130,9 @@ def retry_fetch(chunk_size=5000):
                     if not fetched:
                         continue
                     for k, v in fetched.items():
-                        ko.remove(k)
                         result[k] = v
+                        internal_cache[(key_cache, k)] = v
+                        undone.remove(k)
                     logger.debug(f"└ [{count}] [{chunk[0]} - {chunk[-1]}] = {len(fetched)} items")
 
             logger.info(f"{_log_line(args, kwargs, chunk_size)} = {len(result)} items")
@@ -177,8 +199,9 @@ class WikiApi:
             key_field='wdt:P345',
             val_field='wdt:P480'
         ).items():
-            if len(v) == 1:
-                r[k] = v[0]
+            vals = set(v)
+            if len(vals) == 1:
+                r[k] = vals.pop()
         return r
 
     def get_director(self, *args):
@@ -190,7 +213,7 @@ class WikiApi:
             by_field='wdt:P57'
         ).items():
             if len(v):
-                r[k] = tuple(sorted(v))
+                r[k] = tuple(sorted(set(v)))
         return r
 
     def get_genres(self, *args):
@@ -212,12 +235,8 @@ class WikiApi:
                 obj[k] = v.pop()
         return obj
 
-    @cache
     @retry_fetch(chunk_size=300)
     def get_label_dict(self, *args, key_field: str = None, lang: tuple[str] = None) -> dict[str, list[str | int]]:
-        if len(args) == 0:
-            return {}
-
         if not lang:
             lang = LANGS
 
@@ -275,12 +294,16 @@ class WikiApi:
         r = {k: list(v) for k, v in r.items()}
         return r
 
-    @cache
     @retry_fetch(chunk_size=300)
-    def get_dict(self, *args, key_field: str = None, val_field: str = None, by_field: str = None, lang: str = None) -> dict[str, list[str | int]]:
-        if len(args) == 0:
-            return {}
-        ids = " ".join(map(lambda x: f'"{x}"', args))
+    def get_dict(
+        self,
+        *args,
+        key_field: str = None,
+        val_field: str = None,
+        by_field: str = None,
+        lang: str = None
+    ) -> dict[str, tuple[str | int, ...]]:
+        ids = " ".join(map(lambda x: x if x.startswith("wd:") else f'"{x}"', args))
         if by_field:
             query = dedent('''
                 SELECT ?k ?v WHERE {
@@ -294,10 +317,15 @@ class WikiApi:
                 by_field,
                 val_field,
             )
-            if lang:
-                query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
-                query = query + f'\n      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
-            query = query + "\n}"
+        elif key_field is None:
+            query = dedent('''
+                SELECT ?k ?v WHERE {
+                    VALUES ?k { %s }
+                    ?k %s ?v.
+            ''').strip() % (
+                ids,
+                val_field,
+            )
         else:
             query = dedent('''
                 SELECT ?k ?v WHERE {
@@ -309,144 +337,83 @@ class WikiApi:
                 key_field,
                 val_field,
             )
-            if lang:
-                query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
-                query = query + f'\n    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
-            query = query + "\n}"
-        r = defaultdict(set)
+        if lang:
+            query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
+            query = query + f'\n    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
+        query = query + "\n}"
+        r = defaultdict(list)
+        vKey = 'vLabel' if lang else 'v'
         for i in self.query(query):
-            k = i['k']['value']
-            v = i.get('vLabel' if lang else 'v', {}).get('value')
-            if v is None or (isinstance(v, str) and len(v) == 0):
+            k = _parse_wiki_val(i['k']['value'])
+            v = _parse_wiki_val(i[vKey].get('value'))
+            if v is None:
                 continue
             if v.isdigit():
                 v = int(v)
-            r[k].add(v)
-        r = {k: list(v) for k, v in r.items()}
+            r[k].append(v)
+        r = {k: tuple(v) for k, v in r.items()}
         return r
 
-    @cache
-    def get_countries(self, *args: str) -> dict[str, str]:
-        obj: dict[str, str] = {}
-        main = self.__get_main_countries(*args)
-        prod = self.__get_prod_countries(*args)
-        peop = self.__get_people_countries(*args)
-        for imdb in args:
-            mn = main.get(imdb, tuple())
-            pr = tuple(prod.get(imdb, {}).keys())
-            pp = tuple(peop.get(imdb, {}).keys())
-            countries = set(mn).intersection(pr).intersection(pp)
-            if len(countries) == 0:
-                countries = set(mn).intersection(pp)
-            if len(countries) == 0:
-                countries = set(mn).intersection(pr)
-            if len(countries) == 0:
-                countries = set(mn)
-            if len(countries) == 0:
-                continue
-            count: dict[str, int] = {}
-            for c in countries:
-                count[c] = (peop.get(imdb, {}).get(c, 0), prod.get(imdb, {}).get(c, 0))
-            ordered = sorted(set(count.values()), reverse=True)
-            threshold = ordered[min(len(ordered)-1, 1)]
-            ok: list[str] = []
-            for c, ct in count.items():
-                if ct <= threshold:
-                    ok.append(c)
-            obj[imdb] = " ".join(ok)
-        return obj
+    def get_alpha3(self, *args: str):
+        def _get_dict(val_field: str, *vals: str):
+            obj: dict[str, str] = {}
+            for k, v in self.get_dict(*vals, key_field=None, val_field=val_field).items():
+                set_v = set(map(CF.parse_alpha3, v))
+                set_v.discard(None)
+                if len(set_v) == 1:
+                    obj[k] = set_v.pop()
+            return obj
 
-    @retry_fetch(chunk_size=150)
-    def __get_prod_countries(self, *args: str) -> dict[str, dict[str, int]]:
-        r = defaultdict(dict)
-        ids = " ".join(f'"{x}"' for x in args)
-        query = """
-        SELECT ?imdb (COALESCE(?alpha3_current, ?alpha3_hist, ?alpha3_geonames) AS ?alpha3) WHERE {
-            VALUES ?imdb { %s }
-            ?film wdt:P345 ?imdb .
-            ?film wdt:P272 ?prodCompany .
-            ?prodCompany wdt:P17 ?prodCountry .
-            OPTIONAL { ?prodCountry wdt:P298 ?alpha3_current }
-            OPTIONAL { ?prodCountry wdt:P984 ?alpha3_hist }
-            OPTIONAL { ?prodCountry wdt:P11897 ?alpha3_geonames }
-        }
-        """ % ids
-        for row in self.query(query):
-            imdb = row["imdb"]["value"]
-            alpha3 = row.get("alpha3", {}).get("value")
-            if alpha3:
-                r[imdb][alpha3] = r[imdb].get(alpha3, 0) + 1
-        return dict(r)
-
-    @retry_fetch(chunk_size=150)
-    def __get_people_countries(self, *args: str) -> dict[str, dict[str, int]]:
-        r = defaultdict(dict)
-        ids = " ".join(f'"{x}"' for x in args)
-        query = """
-        SELECT ?imdb ?alpha3 WHERE {
-            VALUES ?imdb { %s }
-
-            ?film wdt:P345 ?imdb .
-
-            # Director
-            OPTIONAL {
-                ?film wdt:P57 ?person1 .
-                ?person1 wdt:P27 ?country1 .
-                ?country1 wdt:P298 ?alpha3 .
-            }
-
-            # Guionista
-            OPTIONAL {
-                ?film wdt:P58 ?person2 .
-                ?person2 wdt:P27 ?country2 .
-                ?country2 wdt:P298 ?alpha3 .
-            }
-
-            # Actor principal
-            OPTIONAL {
-                ?film wdt:P161 ?person3 .
-                ?person3 wdt:P27 ?country3 .
-                ?country3 wdt:P298 ?alpha3 .
-            }
-        }
-        """ % ids
-        for row in self.query(query):
-            imdb = row["imdb"]["value"]
-            alpha3 = row.get("alpha3", {}).get("value")
-            if alpha3:
-                r[imdb][alpha3] = r[imdb].get(alpha3, 0) + 1
-        return dict(r)
-
-    @retry_fetch(chunk_size=150)
-    def __get_main_countries(self, *args: str) -> dict[str, tuple[str, ...]]:
-        r = defaultdict(set)
-        ids = " ".join(f'"{x}"' for x in args)
-        query = """
-        SELECT ?imdb (COALESCE(?alpha3_current, ?alpha3_hist, ?alpha3_geonames) AS ?alpha3) WHERE {
-            VALUES ?imdb { %s }
-            ?item wdt:P345 ?imdb ;
-                wdt:P495 ?country .
-                OPTIONAL { ?country wdt:P298 ?alpha3_current }
-                OPTIONAL { ?country wdt:P984 ?alpha3_hist }
-                OPTIONAL { ?country wdt:P11897 ?alpha3_geonames }
-        }
-        """ % ids
-        for row in self.query(query):
-            imdb = row["imdb"]["value"]
-            alpha3 = row.get("alpha3", {}).get("value")
-            if alpha3:
-                r[imdb].add(alpha3)
-        obj: dict[str, str] = dict()
-        for k, v in r.items():
-            if v:
-                obj[k] = tuple(sorted(v))
-        return obj
+        done: dict[str, str] = {}
+        undone = set(args)
+        for val_field in (
+            "wdt:P298",
+            "p:P298/ps:P298",
+            "wdt:P984",
+            "wdt:P11897",
+        ):
+            undone.difference_update(done.keys())
+            done.update(_get_dict(val_field, *undone))
+        return done
 
     @cache
+    def get_countries(self, *args: str):
+        main = self.get_dict(*args, key_field="wdt:P345", val_field="wdt:P495")
+        q_vals: set[str] = set()
+        for vls in main.values():
+            q_vals.update(vls)
+
+        alpha = self.get_alpha3(*q_vals)
+        main = {
+            kk: tuple(x for x in map(alpha.get, vv) if x is not None)
+            for kk, vv in main.items()
+        }
+        return main
+
     @retry_fetch(chunk_size=300)
+    def __get_countries_from_q_lang(self, *q_lang: str):
+        query = '''
+        SELECT ?language ?country WHERE {
+            VALUES ?language { %s }
+            # O bien idioma oficial (P37)
+            { ?country wdt:P37 ?language . }
+            UNION
+            # O bien lengua hablada aquí (P2936)
+            { ?country wdt:P2936 ?language . }
+            ?country wdt:P31/wdt:P279* wd:Q3624078 .
+        }
+        ''' % " ".join(q_lang)
+        obj: dict[str, set[str]] = defaultdict(set)
+        for row in self.query(query):
+            language = _parse_wiki_val(row.get('language', {}).get('value'))
+            country = _parse_wiki_val(row.get('country', {}).get('value'))
+            if language and country:
+                obj[language].add(country)
+        rtn = {k: tuple(sorted(v)) for k, v in obj.items()}
+        return rtn
+
+    @retry_fetch(chunk_size=1000)
     def get_wiki_url(self, *args):
-        if len(args) == 0:
-            return {}
         ids = " ".join(map(lambda x: f'"{x}"', args))
         order = []
         for i, lang in enumerate(LANGS, start=1):

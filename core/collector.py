@@ -4,7 +4,7 @@ from core.imdb import IMDB, IMDBInfo
 from core.film import Film, IMDb
 from core.wiki import WIKI
 from core.util import re_or, get_first, tp_uniq
-from core.country import to_countries
+from core.country import CF
 from core.genres import fix_genres
 from collections import defaultdict
 from core.filemanager import FM
@@ -139,7 +139,7 @@ def iter_films():
             img=img,
             audio=tuple(),
             subtitle=tuple(),
-            country=to_countries(imdb.countries),
+            country=CF.to_country_uniq_tp(imdb.countries),
             description=v.description,
             year=v.productionDate or imdb.year,
             expiration=v.expirationDate,
@@ -169,7 +169,7 @@ def iter_films():
             img=get_first(v.cover, *v.covers, v.cover_horizontal, v.banner_main, v.banner_trailer),
             audio=tuple(v.lang or []),
             subtitle=tuple(v.subtitle or []),
-            country=to_countries(imdb.countries or v.countries),
+            country=CF.to_country_uniq_tp(imdb.countries or v.countries),
             description=v.description,
             year=v.year or imdb.year,
             expiration=v.expire,

@@ -8,7 +8,7 @@ from core.web import buildSoup, get_text, WEB, find_by_text
 from core.wiki import WIKI
 from typing import NamedTuple, Optional
 from core.dblite import DB, dict_factory, gW
-from core.country import to_alpha_3
+from core.country import CF
 from core.cache import DictCache
 from core.git import G
 
@@ -139,7 +139,7 @@ class IMDBApi:
                 need_info.add(v.id)
         for i in sorted(need_info):
             data = self.get_from_omdbapi(i, autocomplete=i not in obj)
-            countries[i] = to_alpha_3(dict_walk(data, 'Country', instanceof=(list, type(None))))
+            countries[i] = CF.to_alpha_3_uniq_tp(dict_walk(data, 'Country', instanceof=(list, type(None))))
             if i in obj:
                 continue
             obj[i] = IMDBInfo(
@@ -173,7 +173,7 @@ class IMDBApi:
             obj[k] = obj[k]._replace(filmaffinity=v)
         for k, c2 in WIKI.get_countries(*need_countries).items():
             c1 = countries.get(i)
-            obj[k] = obj[k]._replace(countries=self.__merge(c1, tp_split(" ", c2)))
+            obj[k] = obj[k]._replace(countries=self.__merge(c1, c2))
         for k, c1 in countries.items():
             if not obj[k].countries:
                 obj[k] = obj[k]._replace(countries=c1)
