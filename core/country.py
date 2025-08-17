@@ -21,7 +21,9 @@ CUSTOM_ALIASES = {
     "RUS": ("Russia", "Russian Federation"),
     "GBR": ("UK", "United Kingdom"),
     "TWN": ("ROC", "TAI", "Taiwán"),
-    "DEU": ("GER", "Alemania")
+    "DEU": ("GER", "Alemania"),
+    "LVA": ("Letonia", ),
+    "CSK": ("Checoslovaquia", "Czechoslovakia")
 }
 
 
