@@ -54,7 +54,8 @@ class Country(NamedTuple):
             "SUN": "Unión Soviética",
             "PSE": "Palestina",
             "YUG": "Yugoslavia",
-            "SCG": "Serbia y Montenegro"
+            "SCG": "Serbia y Montenegro",
+            "CSK": "Checoslovaquia"
         }.get(slf.alpha_3)
         ico = {
             "FRG": "🇩🇪",
