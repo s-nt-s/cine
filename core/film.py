@@ -61,6 +61,10 @@ class Film(NamedTuple):
             pr = pr.title().replace(" Un ", " un ")
         if pr == "Zonaa":
             pr = "Zona A"
+        if pr == "Acontracorriente":
+            pr = "A Contracorriente"
+        if pr == "Rita&Luca":
+            pr = "Rita & Luca"
         if self.source is None:
             return pr
         if self.source.lower() == pr.lower():

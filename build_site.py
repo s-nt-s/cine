@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from core.log import config_log
-from core.j2 import Jnj2
+from core.j2 import Jnj2, simplify
 import logging
 from datetime import datetime
 from typing import Callable, Any
@@ -84,6 +84,27 @@ for f in films:
         countries[c] = countries.get(c, 0) + 1
 countries = dict(sorted(countries.items(), key=lambda kv: kv[0].spa))
 
+genres_unicode = {
+    "accion": "💥",        # Acción
+    "animacion": "🎨",     # Animación
+    "biografico": "👤",    # Biográfico
+    "belico": "🎖️",       # Bélico
+    "ciencia-ficcion": "👽",  # Ciencia ficción
+    "comedia": "😂",       # Comedia
+    "documental": "📚",    # Documental
+    "drama": "🎭",         # Drama
+    "fantastico": "🪄",    # Fantástico
+    "historico": "🏛️",     # Histórico
+    "infantil": "🧸",      # Infantil
+    "musical": "🎵",       # Musical
+    "oeste": "🤠",         # Oeste
+    "romantico": "❤️",     # Romántico
+    "suspense": "🕵️",     # Suspense
+    "terror": "👻"         # Terror
+}
+for g in map(simplify, genres.keys()):
+    if g not in genres_unicode:
+        genres_unicode[g] = "🎬"
 
 j = Jnj2(
     "template/",
@@ -103,7 +124,8 @@ j.save(
     genres=genres,
     countries=countries,
     NOW=NOW,
-    count=len(films)
+    count=len(films),
+    genres_unicode=genres_unicode
 )
 
 FM.dump("out/films.json", films)

@@ -45,7 +45,7 @@
           <option value="todo" selected>todo</option>
           <optgroup label="Genero">
           {% for g, c in genres.items() %}
-          <option value="{{g|simplify}}">{{g}} ({{c}})</option>
+          <option value="{{g|simplify}}">{{genres_unicode[g|simplify]}} {{g}} ({{c}})</option>
           {% endfor %}
           </optgroup>
           <optgroup label="Proveedor">
