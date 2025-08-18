@@ -231,33 +231,33 @@ div.film > a.poster > img {
   max-width: min(150px, calc(50vw - 1.5em));
 }
 
-body.grid main div.film {
+body.cuadricula main div.film {
   display: inline-block;
   margin: 5px;
   padding: 0;
 }
-body.grid main div.film:not(.expand) > * {
+body.cuadricula main div.film:not(.expand) > * {
   display: none;
 }
-body.grid main div.film.expand {
+body.cuadricula main div.film.expand {
   width: 100%;
   vertical-align: top;
 }
-body.grid main div.film > a.poster {
+body.cuadricula main div.film > a.poster {
   display: block;
   margin-right: 0;
 }
-body.grid main div.film.expand > a.poster {
+body.cuadricula main div.film.expand > a.poster {
   display: inline;
   margin-right: 0.7em !important;
   margin-bottom: 0.5em !important;
 }
-body.grid main div.film > a.poster img {
+body.cuadricula main div.film > a.poster img {
   aspect-ratio: 7 / 10 !important;
   width: min(140px, calc(50vw - 1.5em - 10px)) !important;
   border: 1px solid grey;
 }
-body.grid main div.film.expand > a.poster img {
+body.cuadricula main div.film.expand > a.poster img {
   width: min(70px, calc(50vw - 1.5em - 10px)) !important;
 }
 abbr.expiration {
@@ -307,20 +307,29 @@ div.input {
   gap: 0.5em;
 }
 
-
+.toggle-view input {
+  display: none;
+}
 .toggle-view {
-  display: inline-flex;
-  width: 1em;             /* ancho fijo */
-  height: 1em;            /* altura fija → cuadrado */
-  padding: 10px;            /* espacio interno fijo */
-  border-radius: 12px;
-  border: 1px solid #ccc;
+  margin-top: -0.8em;
+  margin-bottom: -0.8em;
+  margin-left: -0.8em;
+  margin-right: 0.2em;
+  padding-top: 0.5em;
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+  padding-bottom: 0.5em;
+  border-radius: 5px;
+  display: inline-block;
+  width: 1em;
+  aspect-ratio: 1 / 1;
   background-color: #f5f5f5;
   align-items: center;      
   justify-content: center;
   cursor: pointer;
   user-select: none;
-  font-family: "Segoe UI Symbol", "Noto Emoji", sans-serif;
+  font-family: monospace;
+  color: black;
 }
 
 .toggle-view:hover {
@@ -333,9 +342,9 @@ div.input {
   vertical-align: middle;
   line-height: 1;
 }
-body.list span.grid-view {
+body:not(.cuadricula) span.grid-view {
   display: flex !important;
 }
-body.grid span.list-view {
+body.cuadricula span.list-view {
   display: flex !important;
 }

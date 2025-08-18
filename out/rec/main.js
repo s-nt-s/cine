@@ -138,7 +138,9 @@ class FormQuery {
       const opt = document.querySelector(
         'select option[value="' + k + '"]'
       );
-      return [opt.closest("select[id]").id, k];
+      if (opt) return [opt.closest("select[id]").id, k];
+      const inp = document.querySelector('input[value="' + k + '"]');
+      if (inp) return [inp.id, k];
     }
     if (!isNaN(Number(k))) return [null, null];
     if (tmp.length == 1) {
@@ -261,6 +263,11 @@ function setOrder() {
     default_flags.add(defVal);
     const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
     vals.forEach(x => flags.add(x));
+  });
+  document.querySelectorAll('input[type="checkbox"][data-type="flag"]').forEach((s) => {
+    const defVal = "";
+    s.setAttribute("data-current", defVal);
+    flags.add(s.value);
   });
   FormQuery.FLAGS = Object.freeze(Array.from(flags));
   FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
@@ -422,25 +429,22 @@ function mkVideo(url, fireByUser) {
 
 function ifChange(form, id, fnc) {
   const o = document.getElementById(id);
-  const newVal = form[id];
+  const newVal = form[id]??'';
   const oldVal = o.getAttribute("data-current");
-  if (form[id] == oldVal) return;
+  if (newVal == oldVal) return;
   console.log(id, oldVal, "->", newVal);
   fnc(newVal, oldVal);
   o.setAttribute("data-current", newVal);
 }
 
-
 function onChange() {
   const div = document.getElementById("films");
   const form = FormQuery.form();
 
-  document.getElementById("viewToggle").addEventListener("click", (event) => { 
-    const view = document.body.classList.contains("list") ? "grid" : "list";
-    document.body.classList.remove("list", "grid");
-    document.body.classList.add(view);
-  })
-
+  ifChange(form, "view", (newVal, oldVal) => {
+    if(oldVal) document.body.classList.remove(oldVal);
+    if(newVal) document.body.classList.add(newVal);
+  });
   ifChange(form, "order", (newVal, oldVal) => {
     ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
   });
