@@ -202,7 +202,7 @@ function setVal(id, v) {
   }
   if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
     if (arguments.length == 1) v = elm.defaultChecked;
-    elm.checked = v === true;
+    elm.checked = (v === true || v === elm.getAttribute("value"));
     return;
   }
   if (arguments.length == 1) {
