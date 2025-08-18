@@ -97,34 +97,16 @@ class FormQuery {
     if (tmp.length == 0) return [null, null];
     if (tmp.length > 2 || tmp[0].length == 0) return [null, null];
     const k = tmp[0];
-    if (FormQuery.DEF_FLAGS.includes(k) || FormQuery.FLAGS.includes(k)) {
-      const opt = document.querySelector(
-        'select option[value="' + k + '"]'
-      );
+    if (tmp.length == 1) {
+      const opt = document.querySelector('select option[value="' + k + '"]');
       if (opt) return [opt.closest("select[id]").id, k];
       const inp = document.querySelector('input[value="' + k + '"]');
       if (inp) return [inp.id, k];
-    }
-    if (!isNaN(Number(k))) return [null, null];
-    if (tmp.length == 1) {
-      const opt = document.querySelectorAll(
-        'select option[value="' + k + '"]'
-      );
-      if (opt.length == 1) {
-        return [opt[0].closest("select[id]").id, k];
-      }
       return [k, true];
     }
     let v = tmp[1];
     const n = Number(v);
     if (!isNaN(n)) return [k, n];
-    if (v.match(/^\d+-\d+$/)) {
-      const [_min, _max] = v
-        .split("-")
-        .map((i) => Number(i))
-        .sort((a, b) => a - b);
-      return [k, { min: _min, max: _max }];
-    }
     return [k, v];
   }
 }
@@ -207,7 +189,7 @@ function ifLocal() {
 function setOrder() {
   const flags = new Set();
   const default_flags = new Set();
-  document.querySelectorAll('select[data-type="flag"]').forEach((s) => {
+  document.querySelectorAll('select:not([name])').forEach((s) => {
     const arr_options = Array.from(s.options);
     const defVal = arr_options.filter(o => o.getAttribute("selected") != null)[0].value;
     s.setAttribute("data-current", defVal);
@@ -215,7 +197,7 @@ function setOrder() {
     const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
     vals.forEach(x => flags.add(x));
   });
-  document.querySelectorAll('input[type="checkbox"][data-type="flag"]').forEach((s) => {
+  document.querySelectorAll('input[type="checkbox"]:not([name])').forEach((s) => {
     const defVal = "";
     s.setAttribute("data-current", defVal);
     flags.add(s.value);

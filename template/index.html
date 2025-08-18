@@ -28,7 +28,7 @@
     <p>
         <div class="input">
         <label for="order">Ordenar por</label>
-        <select id="order" data-type="flag">
+        <select id="order">
           <option value="publicacion" selected>fecha de publicación</option>
           <option value="expiracion">fecha fin de disponibilidad</option>
           <option value="duracion">duración</option>
@@ -41,7 +41,7 @@
         </div>
         <div class="input">
         <label for="show">Mostrar</label>
-        <select id="show" data-type="flag">
+        <select id="show">
           <option value="todo" selected>todo</option>
           <optgroup label="Genero">
           {% for g, c in genres.items() %}
