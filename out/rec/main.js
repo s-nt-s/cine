@@ -23,12 +23,9 @@ function chunkArray(arr, chunkSize) {
 class FormQuery {
   static ALIAS = Object.freeze({})
   static form() {
-    const d = {
-      range: {},
-    };
+    const d = {};
     document.querySelectorAll("input[id], select[id]").forEach((n) => {
       if (n.disabled) return;
-      if (/_(max|min)$/.test(n.id)) return;
       const v = getVal(n.id);
       if (v === false) return;
       const nm = n.getAttribute("name");
@@ -39,7 +36,6 @@ class FormQuery {
       }
       d[n.id] = v;
     });
-    d.range = getRanges(...FormQuery.RANGE.filter(r => (document.getElementById(r + '_min')?.disabled) === false));
     return d;
   }
   static __form_to_query() {
@@ -59,19 +55,6 @@ class FormQuery {
       }
       qr.push(k + "=" + v);
     });
-    Object.entries(form.range).forEach(([k, v]) => {
-      const n = document.getElementById(k + "_max");
-      if (
-        Number(n.getAttribute("min")) == v.min &&
-        Number(n.getAttribute("max")) == v.max
-      )
-        return;
-      if (FormQuery.RANGE.includes(k) && MX[k] != null) {
-        if (k == "price" && v.min == 0) return qr.push(k + "=" + v.max);
-        if (v.max == MX[k]) return qr.push(k + "=" + v.min);
-      }
-      qr.push(k + "=" + v.min + "-" + v.max);
-    });
     const query = qr.join("&")
     return FormQuery.REV_QUERY[query] ?? query;
   }
@@ -89,20 +72,6 @@ class FormQuery {
       if (document.getElementById(k) == null) return;
       setVal(k, v);
     });
-    const _set_rank_val = (n) => {
-      const [id, k] = n.id.split("_");
-      if (query.range == null || query.range[id] == null || query.range[id][k] == null) {
-        n.value = n.getAttribute(k);
-        return;
-      }
-      n.value = query.range[id][k];
-    }
-    $$("input[id$=_min],input[id$=_max]").forEach(_set_rank_val);
-    if (query.range)
-      Object.entries(query.range).forEach(([k, v]) => {
-        setVal(k + "_min", v["min"]);
-        setVal(k + "_max", v["max"]);
-      });
   }
   static query() {
     const search = (() => {
@@ -110,17 +79,11 @@ class FormQuery {
       if (q.length == 0) return null;
       return FormQuery.ALIAS[q] ?? q;
     })();
-    const d = {
-      range: {},
-    };
+    const d = {};
     if (search == null) return d;
     search.split("&").forEach((i) => {
       const [k, v] = FormQuery.__get_kv(i);
       if (k == null) return;
-      if (typeof v == "object") {
-        d.range[k] = v;
-        return;
-      }
       if (Array.isArray(d[k])) d[k] = v.split("+").map((t) => decodeURIComponent(t));
       else d[k] = v;
     });
@@ -153,9 +116,6 @@ class FormQuery {
       return [k, true];
     }
     let v = tmp[1];
-    if (FormQuery.RANGE.includes(k) && v.match(/^\d+$/) && MX[k] != null) {
-      v = v + '-' + MX[k];
-    }
     const n = Number(v);
     if (!isNaN(n)) return [k, n];
     if (v.match(/^\d+-\d+$/)) {
@@ -177,21 +137,23 @@ function getVal(id) {
     console.log("No se ha encontrado #" + id);
     return null;
   }
+  const tp_val = elm.getAttribute("data-type") || elm.getAttribute("type");
+  const parseVal = (vl) => {
+    if (tp_val == "number") {
+      const num = Number(vl);
+      return isNaN(num) ? null : num;
+    }
+    return vl;
+  };
   if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
     if (elm.checked === false) return false;
     const v = elm.getAttribute("value");
-    if (v != null) return v;
+    if (v != null) return parseVal(v);
     return elm.checked;
   }
   const val = (elm.value ?? "").trim();
   if (val.length == 0) return null;
-  const tp = elm.getAttribute("data-type") || elm.getAttribute("type");
-  if (tp == "number") {
-    const num = Number(val);
-    if (isNaN(num)) return null;
-    return num;
-  }
-  return val;
+  return parseVal(val);
 }
 
 function setVal(id, v) {
@@ -209,17 +171,6 @@ function setVal(id, v) {
     v = elm.defaultValue;
   }
   elm.value = v;
-}
-
-function getRanges() {
-  const rgs = {};
-  Array.from(arguments).forEach((k) => {
-    let mn = getVal(k + "_min");
-    let mx = getVal(k + "_max");
-    if (mn == null || mx == null) return;
-    rgs[k] = { min: mn, max: mx };
-  });
-  return rgs;
 }
 
 function ifLocal() {
@@ -318,10 +269,6 @@ function addExpirationInfo() {
 document.addEventListener(
   "DOMContentLoaded",
   () => {
-    FormQuery.RANGE = Object.freeze(Array.from(new Set(
-      $$("input[id$=_max],input[id$=_min]").filter(n => !n.disabled).map((n) =>
-        n.id.replace(/_(max|min)$/, "")
-      ))));
     addExpirationInfo();
     setOrder();
     ifLocal();
