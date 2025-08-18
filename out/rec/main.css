@@ -231,33 +231,33 @@ div.film > a.poster > img {
   max-width: min(150px, calc(50vw - 1.5em));
 }
 
-body.cuadricula main div.film {
+body.grid main div.film {
   display: inline-block;
   margin: 5px;
   padding: 0;
 }
-body.cuadricula main div.film:not(.expand) > * {
+body.grid main div.film:not(.expand) > * {
   display: none;
 }
-body.cuadricula main div.film.expand {
+body.grid main div.film.expand {
   width: 100%;
   vertical-align: top;
 }
-body.cuadricula main div.film > a.poster {
+body.grid main div.film > a.poster {
   display: block;
   margin-right: 0;
 }
-body.cuadricula main div.film.expand > a.poster {
+body.grid main div.film.expand > a.poster {
   display: inline;
   margin-right: 0.7em !important;
   margin-bottom: 0.5em !important;
 }
-body.cuadricula main div.film > a.poster img {
+body.grid main div.film > a.poster img {
   aspect-ratio: 7 / 10 !important;
   width: min(140px, calc(50vw - 1.5em - 10px)) !important;
   border: 1px solid grey;
 }
-body.cuadricula main div.film.expand > a.poster img {
+body.grid main div.film.expand > a.poster img {
   width: min(70px, calc(50vw - 1.5em - 10px)) !important;
 }
 abbr.expiration {
@@ -305,4 +305,37 @@ div.input {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
+}
+
+
+.toggle-view {
+  display: inline-flex;
+  width: 1em;             /* ancho fijo */
+  height: 1em;            /* altura fija → cuadrado */
+  padding: 10px;            /* espacio interno fijo */
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  background-color: #f5f5f5;
+  align-items: center;      
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  font-family: "Segoe UI Symbol", "Noto Emoji", sans-serif;
+}
+
+.toggle-view:hover {
+  background-color: #e0e0e0;
+}
+.toggle-view > span {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+body.list span.grid-view {
+  display: flex !important;
+}
+body.grid span.list-view {
+  display: flex !important;
 }

@@ -22,10 +22,14 @@
   <style id="dynamicStyle"></style>
 </head>
 
-<body>
+<body class="list">
   {% include "header.html" %}
   <main>
     <p>
+      <div class="toggle-view" id="viewToggle">
+        <span class="list-view" >☰</span>
+        <span class="grid-view" >⌗</span>
+      </div>
         <div class="input">
         <label for="order">Ordenar por</label>
         <select id="order" data-type="flag">
@@ -58,13 +62,6 @@
           <option value="{{c.spa|simplify}}">{{c.ico or "🏴‍☠️"}} {{c.spa}} ({{n}})</option>
           {% endfor %}
           </optgroup>
-        </select>
-        </div>
-        <div class="input">
-        <label for="view">Ver</label>
-        <select id="view" data-type="flag">
-          <option value="lista" selected>lista</option>
-          <option value="cuadricula">cuadricula</option>
         </select>
         </div>
     </p>

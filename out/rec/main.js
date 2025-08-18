@@ -435,10 +435,12 @@ function onChange() {
   const div = document.getElementById("films");
   const form = FormQuery.form();
 
-  ifChange(form, "view", (newVal, oldVal) => {
-    document.body.classList.remove(oldVal);
-    document.body.classList.add(newVal);
-  });
+  document.getElementById("viewToggle").addEventListener("click", (event) => { 
+    const view = document.body.classList.contains("list") ? "grid" : "list";
+    document.body.classList.remove("list", "grid");
+    document.body.classList.add(view);
+  })
+
   ifChange(form, "order", (newVal, oldVal) => {
     ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
   });
