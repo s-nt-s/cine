@@ -189,18 +189,23 @@ function ifLocal() {
 function setOrder() {
   const flags = new Set();
   const default_flags = new Set();
-  document.querySelectorAll('select:not([name])').forEach((s) => {
-    const arr_options = Array.from(s.options);
-    const defVal = arr_options.filter(o => o.getAttribute("selected") != null)[0].value;
+  document.querySelectorAll('input[id][type=checkbox][value],input[id][type=radio][value]').forEach((n) => {
+    const v = (n.getAttribute("value") || "").trim();
+    if (v.length == 0) return;
+    if (document.querySelectorAll('[value="'+v+"']").length > 1) return;
+    n.setAttribute("data-current", "");
+    flags.add(v);
+  });
+  document.querySelectorAll('select[id]').forEach((s) => {
+    const options = Array.from(s.options).filter(o => {
+      return document.querySelectorAll('[value="'+o.value+'"]').length == 1;
+    });
+    if (options.length != s.options.length) return;
+    const defVal = options.filter(o => o.getAttribute("selected") != null)[0].value;
     s.setAttribute("data-current", defVal);
     default_flags.add(defVal);
-    const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
+    const vals = options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
     vals.forEach(x => flags.add(x));
-  });
-  document.querySelectorAll('input[type="checkbox"]:not([name])').forEach((s) => {
-    const defVal = "";
-    s.setAttribute("data-current", defVal);
-    flags.add(s.value);
   });
   FormQuery.FLAGS = Object.freeze(Array.from(flags));
   FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
