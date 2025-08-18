@@ -61,6 +61,7 @@ class Country(NamedTuple):
             "SCG": "Serbia y Montenegro",
             "CSK": "Checoslovaquia"
         }.get(slf.alpha_3)
+        alpha_2 = CF.alpha3_to_alpha2(slf.alpha_3)
         ico = {
             "FRG": "🇩🇪",
             "DDR": "🇩🇪",

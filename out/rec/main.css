@@ -301,3 +301,8 @@ span.povider[class*='efilm'] {
   letter-spacing: 0.05em;
   color: #F36C5D;
 }
+div.input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}

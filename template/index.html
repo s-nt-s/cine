@@ -26,6 +26,7 @@
   {% include "header.html" %}
   <main>
     <p>
+        <div class="input">
         <label for="order">Ordenar por</label>
         <select id="order" data-type="flag">
           <option value="publicacion" selected>fecha de publicación</option>
@@ -37,11 +38,8 @@
           <!--option value="genero">genero</option-->
           <option value="imdb">puntuación en IMDb</option>
         </select>
-        <label for="view">Ver</label>
-        <select id="view" data-type="flag">
-          <option value="lista" selected>lista</option>
-          <option value="cuadricula">cuadricula</option>
-        </select>
+        </div>
+        <div class="input">
         <label for="show">Mostrar</label>
         <select id="show" data-type="flag">
           <option value="todo" selected>todo</option>
@@ -61,6 +59,14 @@
           {% endfor %}
           </optgroup>
         </select>
+        </div>
+        <div class="input">
+        <label for="view">Ver</label>
+        <select id="view" data-type="flag">
+          <option value="lista" selected>lista</option>
+          <option value="cuadricula">cuadricula</option>
+        </select>
+        </div>
     </p>
     <div id="films">
       {% for f in fl %}
