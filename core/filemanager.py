@@ -74,11 +74,12 @@ class FileManager:
         """
         s_file = str(file).lower()
         for k, v in {
-            ".dct.txt": "dct"
+            ".dct.txt": "dct",
+            ".qw.txt": "qw"
         }.items():
             if s_file.endswith(k):
                 return v
-            
+
         ext = file.suffix.lstrip(".")
         ext = ext.lower()
         return {
@@ -180,6 +181,17 @@ class FileManager:
             txt = txt.format(*args, **kwargs)
         with open(file, "w") as f:
             f.write(txt)
+
+    def load_qw(self, file, *args, **kwargs):
+        file = self.resolve_path(file)
+        if not file.is_file():
+            return tuple()
+        txt = self.load_txt(file)
+        if txt is None:
+            return tuple()
+        words = set(map(str.strip, txt.split()))
+        words.discard('')
+        return tuple(sorted(words))
 
     def load_dct(self, file, *args, **kwargs):
         file = self.resolve_path(file)

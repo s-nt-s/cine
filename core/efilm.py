@@ -148,10 +148,7 @@ class EFilm:
             "&languages=1",
             "&subtitles=1"
         ):
-            js = self.get_list(
-                #"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/audiovisual_type/?audiovisual_type=Pel%C3%ADculas"
-                root+query
-            )
+            js = self.get_list(root+query)
             for i in mapdict(_clean_js, js, compact=True):
                 if i['id'] not in done:
                     done.add(i['id'])
@@ -182,7 +179,7 @@ class EFilm:
             arr.append(f'year={year} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        if provider in ('Mondo', "Miguel Rodríguez arias"): #'Azteca', "Alex Quiroga"):
+        if provider in ('Mondo', "Miguel Rodríguez arias", "Alex Quiroga"): #'Azteca'):
             arr.append(f'provider={provider}')
         return tuple(arr)
 

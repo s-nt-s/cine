@@ -26,8 +26,12 @@ def get_imdb(*args: RtveVideo | EFilmVideo):
 
 
 def get_films():
+    ban: tuple[str, ...] = FM.load("cache/ban.qw.txt")
     arr: list[Film] = []
     for source, imdb, v in iter_films():
+        if imdb and imdb.id in ban:
+            logger.debug(f"{v.url} descartado por ban")
+            continue
         if not isinstance(v.imdb, IMDb) or not isinstance(v.imdb.id, str):
             v = v._replace(imdb=None)
         ko = is_ko(source, imdb)

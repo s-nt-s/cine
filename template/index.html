@@ -29,14 +29,13 @@
         <div class="input">
         <label for="order">Ordenar por</label>
         <select id="order">
-          <option value="publicacion" selected>fecha de publicación</option>
-          <option value="expiracion">fecha fin de disponibilidad</option>
-          <option value="duracion">duración</option>
-          <option value="estreno">año de estreno</option>
-          <option value="titulo">título</option>
-          <option value="director">director/a</option>
-          <!--option value="genero">genero</option-->
-          <option value="imdb">puntuación en IMDb</option>
+          <option value="publicacion" selected>🗓️ fecha de publicación</option>
+          <option value="expiracion">⏳ fecha fin de disponibilidad</option>
+          <option value="duracion">⏱️ duración</option>
+          <option value="estreno">🍿 año de estreno</option>
+          <option value="titulo">🆎 título</option>
+          <option value="director">🎥 director/a</option>
+          <option value="imdb">⭐ puntuación en IMDb</option>
         </select>
         </div>
         <div class="input">
@@ -48,14 +47,14 @@
           <option value="{{g|simplify}}">{{genres_unicode[g|simplify]}} {{g}} ({{c}})</option>
           {% endfor %}
           </optgroup>
-          <optgroup label="Proveedor">
-          {% for p, c in providers.items() %}
-          <option value="{{p|simplify}}">{{p}} ({{c}})</option>
-          {% endfor %}
-          </optgroup>
           <optgroup label="País">
           {% for c, n in countries.items() %}
           <option value="{{c.spa|simplify}}">{{c.ico or "🏴‍☠️"}} {{c.spa}} ({{n}})</option>
+          {% endfor %}
+          </optgroup>
+          <optgroup label="Proveedor">
+          {% for p, c in providers.items() %}
+          <option value="{{p|simplify}}">{{p}} ({{c}})</option>
           {% endfor %}
           </optgroup>
         </select>
