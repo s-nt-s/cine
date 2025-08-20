@@ -68,7 +68,7 @@
           <p class="botonera">
             {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
             {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}
-            {%if f.imdb%}{{f.imdb.to_html() | safe }} {% endif %}{%if f.filmaffinity%}<a title="Ficha FilmAffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">FA</a> {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
+            {%if f.imdb%}{{f.imdb.to_html()|safe }} {% endif %}{%if f.filmaffinity%}{{f.filmaffinity.to_html()|safe}} {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
             {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}
           </p>
           <p>

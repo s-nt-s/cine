@@ -1,7 +1,8 @@
 from core.rtve import Rtve, Video as RtveVideo
 from core.efilm import EFilm, Video as EFilmVideo
 from core.imdb import IMDB, IMDBInfo
-from core.film import Film, IMDb
+from core.film import Film, IMDb, FilmAffinity
+from core.req import R
 from core.wiki import WIKI
 from core.util import re_or, get_first, tp_uniq
 from core.country import CF
@@ -11,9 +12,11 @@ from core.filemanager import FM
 import re
 import logging
 from datetime import date
+from functools import cache
 
 logger = logging.getLogger(__name__)
 TODAY = date.today()
+
 
 def get_imdb(*args: RtveVideo | EFilmVideo):
     ids: set[str] = set()
@@ -70,6 +73,14 @@ def _sort_dup_films(f: Film):
     return tuple(arr)
 
 
+@cache
+def get_filmaffinity(id: int):
+    obj = R.safe_get_json(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{id}.json")
+    if not isinstance(obj, dict):
+        return {}
+    return obj
+
+
 def complete_film(v: Film):
     if v is None:
         return v
@@ -78,6 +89,14 @@ def complete_film(v: Film):
         director=tp_uniq(v.director),
         genres=tp_uniq(v.genres)
     )
+    if isinstance(v.filmaffinity, int):
+        obj = get_filmaffinity(v.filmaffinity)
+        v = v._replace(filmaffinity=FilmAffinity(
+            id=v.filmaffinity,
+            rate=obj.get("rate"),
+            votes=obj.get("votes"),
+            reviews=obj.get("reviews")
+        ))
     if v.expiration and date(*map(int, re.findall(r"\d+", v.expiration)[:3])) < TODAY:
         logger.debug(f"{v.expiration} eliminada por incongruente, {v.url}")
         v = v._replace(expiration=None)

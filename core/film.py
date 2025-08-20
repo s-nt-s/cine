@@ -11,12 +11,9 @@ class IMDb(NamedTuple):
 
     def to_html(self) -> str:
         title = self.get_title()
-        html = f' <a class="imdb" title="{title}"href="https://www.imdb.com/es-es/title/{self.id}">IMDb'
+        html = f'<a class="imdb" title="{title}" href="https://www.imdb.com/es-es/title/{self.id}">IMDb'
         if self.rate:
-            html += ' <span class="imdbRate"'
-            if self.votes:
-                html += f' en base a {self.votes} votos'
-            html += f'">{self.rate}</span>'
+            html += f' <span class="imdbRate">{self.rate}</span>'
         html += '</a>'
         return html
 
@@ -26,6 +23,30 @@ class IMDb(NamedTuple):
         if self.votes:
             return f"Ficha IMDb ({self.rate} sobre 10 en base a {self.votes} votos)"
         return f"Ficha IMDb ({self.rate} sobre 10)"
+
+
+class FilmAffinity(NamedTuple):
+    id: int
+    rate: float
+    votes: int
+    reviews: int
+
+    def to_html(self) -> str:
+        title = self.get_title()
+        html = f'<a class="filmaffinity" title="{title}" href="https://www.filmaffinity.com/es/film{self.id}.html">FM'
+        if self.rate:
+            html += f' <span class="filmaffinityRate">{self.rate}</span>'
+        html += '</a>'
+        return html
+
+    def get_title(self) -> str:
+        if self.rate is None:
+            return "Ficha FilmAffinity"
+        if self.votes and self.reviews is None:
+            return f"Ficha FilmAffinity ({self.rate} sobre 10 en base a {self.votes} votos)"
+        if self.votes and self.reviews is not None:
+            return f"Ficha FilmAffinity ({self.rate} sobre 10 en base a {self.votes} votos y {self.reviews} críticas)"
+        return f"Ficha FilmAffinity ({self.rate} sobre 10)"
 
 
 class Film(NamedTuple):
@@ -43,10 +64,10 @@ class Film(NamedTuple):
     publication: str
     duration: int
     wiki: WikiUrl
-    filmaffinity: str | None
     director: tuple[str, ...]
     casting: tuple[str, ...]
     genres: tuple[str, ...]
+    filmaffinity: Optional[FilmAffinity] = None
     imdb: Optional[IMDb] = None
     provider: str = None
     alt: tuple["Film", ...] = tuple()
