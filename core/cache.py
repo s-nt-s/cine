@@ -186,6 +186,6 @@ class DictCache(Cache):
         return False
 
     def save(self, file, data, *args, **kwargs):
-        if isinstance(data, dict):
+        if isinstance(data, dict) and data.get('__time__') is None:
             data['__time__'] = datetime.now().strftime("%Y-%m-%d %H:%M")
         return super().save(file, data, *args, **kwargs)

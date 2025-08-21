@@ -13,6 +13,7 @@ import re
 import logging
 from datetime import date
 from functools import cache
+from core.filmaffinity import FilmM
 
 logger = logging.getLogger(__name__)
 TODAY = date.today()
@@ -29,7 +30,7 @@ def get_imdb(*args: RtveVideo | EFilmVideo):
 
 
 def get_films():
-    ban: tuple[str, ...] = FM.load("cache/ban.qw.txt")
+    ban: tuple[str, ...] = tuple() #FM.load("cache/ban.qw.txt")
     arr: list[Film] = []
     for source, imdb, v in iter_films():
         if imdb and imdb.id in ban:
@@ -71,14 +72,6 @@ def _sort_dup_films(f: Film):
     arr.append(-len(f.subtitle))
     arr.append(f.title)
     return tuple(arr)
-
-
-@cache
-def get_filmaffinity(id: int):
-    obj = R.safe_get_json(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{id}.json")
-    if not isinstance(obj, dict):
-        return {}
-    return obj
 
 
 def complete_film(v: Film):
@@ -126,6 +119,20 @@ def get_filmaffinity_cache(name: str) -> dict[int, int]:
     return r
 
 
+def get_filmaffinity(id: int):
+    if not isinstance(id, int):
+        return None
+    fm = FilmM.get(id)
+    if fm is None:
+        return FilmAffinity(id=id)
+    return FilmAffinity(
+        id=id,
+        reviews=fm.reviews,
+        votes=fm.votes,
+        rate=fm.rate
+    )._fix()
+
+
 def iter_films():
     rtve = Rtve().get_videos()
     eflim = EFilm(
@@ -166,7 +173,7 @@ def iter_films():
                 votes=imdb.votes
             )._fix(),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=FilmAffinity.build(rtve_filmaffinity.get(v.id) or imdb.filmaffinity),
+            filmaffinity=get_filmaffinity(rtve_filmaffinity.get(v.id) or imdb.filmaffinity),
             director=v.director,
             casting=v.casting,
             genres=get_rtve_genres(v, imdb),
@@ -196,7 +203,7 @@ def iter_films():
                 votes=imdb.votes
             )._fix(),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=FilmAffinity.build(efilm_filmaffinity.get(v.id) or imdb.filmaffinity),
+            filmaffinity=get_filmaffinity(efilm_filmaffinity.get(v.id) or imdb.filmaffinity),
             director=v.director,
             casting=v.actors,
             genres=v.genres,
@@ -217,12 +224,15 @@ def is_ko(source, i: IMDBInfo, v: Film):
             return f"imdb_type={i.typ}"
         if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
             return f"imdb_type={i.typ}"
-    if "Comedia" not in v.genres and (v.get_rate() or 999) < 4:
-        if re.search(r"\bSEAL", v.description):
-            return f"rate={v.get_rate()} temática SEAL"
-        if v.filmaffinity:
-            obj = R.safe_get_dict(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{v.filmaffinity.id}.json")
-            genres = (obj or {}).get("genres") or []
+    rate = v.get_rate() or 999
+    if rate < 5 and v.year > 1980:
+        fm = FilmM.get(v.filmaffinity.id if v.filmaffinity else None)
+        genres = set(fm.genres if fm else tuple())
+        if not genres.intersection(("Serie B", "Película de culto")):
+            if rate < 4:
+                return f"rate={rate}"
+            if rate < 5 and genres.intersection(("Slasher", "Terrorismo", "Infantil", "Cine familiar")):
+                return f"rate={rate} fm_genres={tuple(genres)}"
 
 
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:

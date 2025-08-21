@@ -52,25 +52,6 @@ class FilmAffinity(NamedTuple):
     votes: int = None
     reviews: int = None
 
-    @classmethod
-    @cache
-    def build(cls, id: int):
-        if id is None:
-            return None
-        obj = R.safe_get_dict(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{id}.json")
-        if not obj:
-            return cls(id=id)
-
-        rate = _parse_num(obj.get("rate"))
-        votes = _parse_num(obj.get("votes"))
-        reviews = _parse_num(obj.get("reviews"))
-        return cls(
-            id=id,
-            rate=rate if (votes or 0, reviews or 0) != (0, 0) else None,
-            votes=votes,
-            reviews=reviews
-        )._fix()
-
     def get_url(self) -> str:
         return f"https://www.filmaffinity.com/es/film{self.id}.html"
 
