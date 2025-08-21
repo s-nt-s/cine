@@ -256,7 +256,8 @@ for mth in dir(FileManager):
 class DictFile:
     def __init__(self, file: str):
         self.__file = file
-        self.__data: dict[int, str] = FM.load(file)
+        path = FM.resolve_path(file)
+        self.__data: dict[int, str] = FM.load(file) if path.is_file() else {}
 
     def dump(self):
         FM.dump(self.__file, self.__data)

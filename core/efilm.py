@@ -10,7 +10,7 @@ import time
 from core.util import tp_split
 import re
 from core.dblite import DB
-from core.filemanager import DictFile
+from core.filemanager import DictFile, FM
 
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,8 @@ def _g_date(dt: str):
 
 class EFilm:
     def __init__(self, origin: str, min_duration=50):
-        self.__cache = DictFile("cache/efilm.dct.txt")
+        self.__cache: dict[int, str] = FM.load("cache/efilm.dct.txt")
+        self.__new_cache = DictFile("cache/efilm.new.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
         self.__origin = origin
@@ -231,7 +232,7 @@ class EFilm:
                 countries=_to_tuple(*coun),
                 created=_g_date(ficha.get('created')),
                 expire=_g_date(ficha.get('expire')),
-                imdb=self.__cache.get(i['id'])
+                imdb=self.__cache.get(i['id']) or self.__new_cache.get(i['id'])
             )
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
@@ -240,9 +241,9 @@ class EFilm:
                 imdb = DB.search_imdb_id(v.name, v.year, v.director, v.duration)
                 if imdb:
                     v = v._replace(imdb=imdb)
-                    self.__cache.set(v.id, imdb)
+                    self.__new_cache.set(v.id, imdb)
             arr.add(v)
-        self.__cache.dump()
+        self.__new_cache.dump()
         logger.info(f"{len(arr)} recuperados de efilm")
         return tuple(sorted(arr, key=lambda v: v.id))
 
