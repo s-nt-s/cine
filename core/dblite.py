@@ -4,6 +4,7 @@ from atexit import register
 import logging
 from functools import cache
 from core.film import IMDb
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,12 @@ class DBlite:
             obj[k] = v
         return obj
 
+    def get_dict_set(self, *args, **kwargs):
+        obj = defaultdict(set)
+        for k, v in self.select(*args, **kwargs):
+            obj[k].add(v)
+        return dict(obj)
+
     def close(self):
         if self.__con is None:
             return
@@ -142,16 +149,24 @@ class DBlite:
             votes=row[4]
         )._fix()
 
-    def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None, duration: int = None) -> int | None:
+    def search_imdb_id(
+            self,
+            title: str,
+            year: int,
+            director: tuple[str, ...] = None,
+            duration: int = None,
+            year_gap: int = 5,
+            full_match: bool = False
+    ) -> int | None:
         if director is None:
             director = None
-        id_titles = self.__search_movie_by_title(title, min_year=year-5, max_year=year+5, duration=duration)
-        if len(id_titles) == 1:
+        id_titles = self.__search_movie_by_title(title, min_year=year-year_gap, max_year=year+year_gap, duration=duration)
+        if not full_match and len(id_titles) == 1:
             return id_titles[0]
-        id_director = self.__search_movie_by_director(*director, min_year=year-5, max_year=year+5, duration=duration)
-        if len(id_director) == 1:
+        id_director = self.__search_movie_by_director(*director, min_year=year-year_gap, max_year=year+year_gap, duration=duration)
+        if not full_match and len(id_director) == 1:
             return id_director[0]
-        ok = set(id_director).intersection(id_director)
+        ok = set(id_director).intersection(id_titles)
         if len(ok) == 1:
             return ok.pop()
         return None

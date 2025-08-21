@@ -184,7 +184,7 @@ class EFilm:
         return tuple(arr)
 
     @Cache("rec/efilm/ficha/{}.json")
-    def get_ficha(self, id: int):
+    def get_ficha(self, id: int) -> dict:
         url = f"https://backend-prod.efilm.online/api/v1/videos/audiovisuals/{id}/"
         js = self.get_json(url)
         js = mapdict(_clean_js, js, compact=True)
