@@ -30,12 +30,14 @@
         <label for="order">Ordenar por</label>
         <select id="order">
           <option value="publicacion" selected>🗓️ fecha de publicación</option>
-          <option value="expiracion">⏳ fecha fin de disponibilidad</option>
+          <option value="expiracion">⏳ fin de disponibilidad</option>
           <option value="duracion">⏱️ duración</option>
           <option value="estreno">🍿 año de estreno</option>
           <option value="titulo">🆎 título</option>
           <option value="director">🎥 director/a</option>
-          <option value="imdb">⭐ puntuación en IMDb</option>
+          <option value="puntuacion">⭐ puntuación</option>
+          <!--option value="imdb">⭐ puntuación en IMDb</option>
+          <option value="filmaffinity">💠 puntuación en FilmAffinity</option-->
         </select>
         </div>
         <div class="input">
@@ -68,7 +70,10 @@
           <p class="botonera">
             {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
             {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}
-            {%if f.imdb%}{{f.imdb.to_html()|safe }} {% endif %}{%if f.filmaffinity%}{{f.filmaffinity.to_html()|safe}} {%endif%}{%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
+            {{f.get_score().to_html()|safe}}
+            {%if f.imdb%}{{f.imdb.to_html()|safe }} {% endif %}
+            {%if f.filmaffinity%}{{f.filmaffinity.to_html()|safe}} {%endif%}
+            {%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
             {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}
           </p>
           <p>

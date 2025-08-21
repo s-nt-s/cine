@@ -3,7 +3,6 @@ from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any,
 from bs4 import Tag, BeautifulSoup
 from minify_html import minify
 import unicodedata
-import requests
 import logging
 from unidecode import unidecode
 from urllib.parse import urlparse, ParseResult
@@ -348,38 +347,6 @@ def dict_tuple(obj: Dict[str, Union[Set, List, Tuple]]):
     return {k: tuple(sorted(set(v))) for k, v in obj.items()}
 
 
-def safe_get_list_dict(url) -> List[Dict]:
-    js = []
-    try:
-        r = requests.get(url)
-        js = r.json()
-    except Exception:
-        logger.critical(url+" no se puede recuperar", exc_info=True)
-        pass
-    if not isinstance(js, list):
-        logger.critical(url+" no es una lista")
-        return []
-    for i in js:
-        if not isinstance(i, dict):
-            logger.critical(url+" no es una lista de diccionarios")
-            return []
-    return js
-
-
-def safe_get_dict(url) -> Dict:
-    js = {}
-    try:
-        r = requests.get(url)
-        js = r.json()
-    except Exception:
-        logger.critical(url+" no se puede recuperar", exc_info=True)
-        pass
-    if not isinstance(js, dict):
-        logger.critical(url+" no es un diccionario")
-        return {}
-    return js
-
-
 def plain_text(s: Union[str, Tag], is_html=False):
     if isinstance(s, str) and is_html:
         s = BeautifulSoup(s, "html.parser")
@@ -441,11 +408,6 @@ def re_and(s: str, *args: Union[str, Tuple[str]], to_log: str = None, flags=0):
     if to_log:
         logger.debug(f"{to_log} cumple {txt}")
     return txt
-
-
-def get_redirect(url: str):
-    r = requests.get(url, allow_redirects=False)
-    return r.headers.get('Location')
 
 
 def to_datetime(s: str):

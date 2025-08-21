@@ -352,3 +352,22 @@ body:not(.cuadricula) span.grid-view {
 body.cuadricula span.list-view {
   display: flex !important;
 }
+span.score {
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+  padding: 0.2em 0.5em;
+  border-radius: 0.5em;
+  font-size: 0.9em;
+  color: white;
+}
+span.score_filmaffinity {
+  background-color: #4B8BBE;
+  color: #FFD700;
+}
+span.score_imdb {
+  background-color: #b38600;
+  color: black;
+}
+span.score_none {
+  background-color: grey;
+}

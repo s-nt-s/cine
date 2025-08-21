@@ -140,7 +140,7 @@ class DBlite:
             id=id,
             rate=row[3],
             votes=row[4]
-        )
+        )._fix()
 
     def search_imdb_id(self, title: str, year: int, director: tuple[str, ...] = None, duration: int = None) -> int | None:
         if director is None:

@@ -11,7 +11,7 @@ from core.util import dict_walk, trim, re_or, mapdict, tp_split, dict_walk_posit
 import re
 from functools import cache
 from typing import NamedTuple
-from core.filemanager import FM, DictFile
+from core.filemanager import DictFile
 from core.dblite import DB
 
 

@@ -89,14 +89,6 @@ def complete_film(v: Film):
         director=tp_uniq(v.director),
         genres=tp_uniq(v.genres)
     )
-    if isinstance(v.filmaffinity, int):
-        obj = get_filmaffinity(v.filmaffinity)
-        v = v._replace(filmaffinity=FilmAffinity(
-            id=v.filmaffinity,
-            rate=obj.get("rate"),
-            votes=obj.get("votes"),
-            reviews=obj.get("reviews")
-        ))
     if v.expiration and date(*map(int, re.findall(r"\d+", v.expiration)[:3])) < TODAY:
         logger.debug(f"{v.expiration} eliminada por incongruente, {v.url}")
         v = v._replace(expiration=None)
@@ -172,9 +164,9 @@ def iter_films():
                 id=imdb.id,
                 rate=imdbRate,
                 votes=imdb.votes
-            ),
+            )._fix(),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=rtve_filmaffinity.get(v.id) or imdb.filmaffinity,
+            filmaffinity=FilmAffinity.build(rtve_filmaffinity.get(v.id) or imdb.filmaffinity),
             director=v.director,
             casting=v.casting,
             genres=get_rtve_genres(v, imdb),
@@ -202,9 +194,9 @@ def iter_films():
                 id=imdb.id,
                 rate=imdb.rating,
                 votes=imdb.votes
-            ),
+            )._fix(),
             wiki=WIKI.parse_url(imdb.wiki),
-            filmaffinity=efilm_filmaffinity.get(v.id) or imdb.filmaffinity,
+            filmaffinity=FilmAffinity.build(efilm_filmaffinity.get(v.id) or imdb.filmaffinity),
             director=v.director,
             casting=v.actors,
             genres=v.genres,

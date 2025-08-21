@@ -10,7 +10,7 @@ import time
 from core.util import tp_split
 import re
 from core.dblite import DB
-from core.filemanager import FM, DictFile
+from core.filemanager import DictFile
 
 
 logger = logging.getLogger(__name__)

@@ -29,6 +29,17 @@ def sort_ids(fnc: Callable[[Film], Any], reverse=False):
     return tuple(map(lambda x: f"{x.source}{x.id}", arr))
 
 
+def sort_score(f: Film):
+    arr = []
+    s = f.get_score()
+    arr.append(s.rate if s else None)
+    arr.append(s.votes if s else None)
+    arr.append(s.reviews if s else None)
+    arr.append(int(bool(f.filmaffinity is not None)))
+    arr.append(int(bool(f.imdb is not None)))
+    return tuple(map(lambda x: 0 if x is None else -x, arr))
+
+
 print("Generando web")
 order: dict[str, tuple[str, ...]] = dict()
 order['publicacion'] = sort_ids(lambda f: f.publication or '', reverse=True)
@@ -38,7 +49,19 @@ order['estreno'] = sort_ids(lambda f: f.year or 0, reverse=True)
 #order['genero'] = sort_ids(lambda f: f.genres)
 order['titulo'] = sort_ids(lambda f: f.title)
 order['director'] = sort_ids(lambda f: f.director)
-order['imdb'] = sort_ids(lambda f: (-(f.imdb.rate if f.imdb and f.imdb.rate else -1), 0 if f.imdb else 1))
+order['puntuacion'] = sort_ids(sort_score)
+order['imdb'] = sort_ids(lambda f: (
+        -(f.imdb.rate if f.imdb and f.imdb.rate else -1),
+        -(f.imdb.votes if f.imdb and f.imdb.votes else -1),
+        0 if f.imdb else 1
+    )
+)
+order['filmaffinity'] = sort_ids(lambda f: (
+        -(f.filmaffinity.rate if f.filmaffinity and f.filmaffinity.rate else -1),
+        -(f.filmaffinity.votes if f.filmaffinity and f.filmaffinity.votes else -1),
+        0 if f.filmaffinity else 1
+    )
+)
 
 
 def mk_date(s: str):

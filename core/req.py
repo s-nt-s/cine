@@ -1,61 +1,58 @@
-from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
-from socket import timeout
+import requests
+from requests.exceptions import RequestException, Timeout, HTTPError
 from functools import cache
 import logging
-import json
-import gzip
-from io import TextIOWrapper
-import csv
-from http.client import HTTPResponse
 from time import sleep
 from json.decoder import JSONDecodeError
 
 logger = logging.getLogger(__name__)
 
 
+def _get_http_code(x):
+    if isinstance(x, HTTPError):
+        x = x.response
+    if isinstance(x, requests.Response):
+        return x.status_code
+
+
 class Req:
+    def __init__(self):
+        self.__S = requests.Session()
+
+    def __get_response(self, url: str, headers: frozenset = None, data: bytes = None):
+        hdrs = dict(headers or frozenset())
+        if data:
+            r = self.__S.post(url, headers=hdrs, data=data, timeout=15)
+        else:
+            r = self.__S.get(url, headers=hdrs, timeout=15)
+        r.raise_for_status()
+        return r
 
     @cache
     def __get_body(self, url: str, headers: frozenset = None, data: bytes = None) -> str:
-        req = Request(
-            url,
-            headers=dict(headers or frozenset()),
-            data=data
-        ) if headers or data else url
-        r: HTTPResponse
-        with urlopen(req) as r:
-            charset: str = r.headers.get_content_charset() or 'utf-8'
-            body: str = r.read().decode(charset, errors="replace")
-            body = body.strip()
-            return body
+        r = self.__get_response(url, headers=headers, data=data)
+        body = r.text.strip()
+        return body
 
-    def get_body(self, url: str, headers: dict = None, chances: int = 1, data: bytes = None, silent=False):
-        chances = max(chances, 1)
-        frz = frozenset(headers.items()) if headers else None
-        for i in range(1, chances + 1):
-            try:
-                return self.__get_body(url, headers=frz, data=data)
-            except (HTTPError, URLError, UnicodeDecodeError, timeout) as e:
-                if i == chances:
-                    if not silent:
-                        logger.critical(f"[KO] {url} {e}")
-                    return None
-                sleep(10)
+    @cache
+    def __get_json(self, url: str, headers: frozenset = None, data: bytes = None) -> str:
+        r = self.__get_response(url, headers=headers, data=data)
+        js = r.json()
+        return js
 
     def get_json(
-            self,
-            url: str,
-            headers: dict = None,
-            data: bytes = None,
-            wait_if_status: dict[int, int] = None
+        self,
+        url: str,
+        headers: dict = None,
+        data: bytes = None,
+        wait_if_status: dict[int, int] = None
     ) -> list | dict:
         frz = frozenset(headers.items()) if headers else None
         try:
-            body = self.__get_body(url, headers=frz, data=data)
-            return json.loads(body)
+            js = self.__get_json(url, headers=frz, data=data)
+            return js
         except HTTPError as e:
-            wait = (wait_if_status or {}).get(e.code, 0)
+            wait = (wait_if_status or {}).get(_get_http_code(e), 0)
             if wait <= 0:
                 raise
         sleep(wait)
@@ -64,25 +61,28 @@ class Req:
     def safe_get_json(self, url, *args, **kwargs):
         try:
             return self.get_json(url, *args, **kwargs)
-        except (HTTPError, URLError, UnicodeDecodeError, timeout, JSONDecodeError) as e:
-            if not isinstance(e, HTTPError) or e.code != 404:
+        except (HTTPError, RequestException, UnicodeDecodeError, Timeout, JSONDecodeError) as e:
+            if _get_http_code(e) != 404:
                 logger.warning(f"{url} {str(e)}")
             return None
 
-    def iter_tsv(self, url: str):
-        with urlopen(url) as r:
-            with gzip.GzipFile(fileobj=r) as gz:
-                stream = TextIOWrapper(
-                    gz,
-                    encoding='utf-8',
-                    newline=''
-                )
-                reader = csv.reader(
-                    stream,
-                    delimiter='\t',
-                    quoting=csv.QUOTE_NONE
-                )
-                yield from reader
+    def safe_get_list_dict(self, url: str) -> list[dict]:
+        js = self.safe_get_json(url)
+        if not isinstance(js, list):
+            logger.critical(url+" no es una lista")
+            return []
+        for i in js:
+            if not isinstance(i, dict):
+                logger.critical(url+" no es una lista de diccionarios")
+                return []
+        return js
+
+    def safe_get_dict(self, url: str) -> dict:
+        js = self.safe_get_json(url)
+        if not isinstance(js, dict):
+            logger.critical(url+" no es un diccionario")
+            return {}
+        return js
 
 
 R = Req()
