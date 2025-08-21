@@ -37,7 +37,7 @@ def get_films():
             continue
         if not isinstance(v.imdb, IMDb) or not isinstance(v.imdb.id, str):
             v = v._replace(imdb=None)
-        ko = is_ko(source, imdb)
+        ko = is_ko(source, imdb, v)
         if ko:
             logger.debug(f"{v.url} descartado por {ko}")
             continue
@@ -204,20 +204,25 @@ def iter_films():
         )
 
 
-def is_ko(source, i: IMDBInfo):
-    if i is None:
-        return None
-    if not isinstance(i, IMDBInfo):
-        raise ValueError(i)
-    banIfTv = False
-    if isinstance(source, RtveVideo):
-        banIfTv = re_or(source.longTitle, "Sesión de tarde", flags=re.I) and re_or(source.mainTopic, "Cine internacional", flags=re.I)
-    if not banIfTv:
-        banIfTv = not i.awards and i.countries and "ESP" not in i.countries
-    if i.typ in ('tvEpisode', 'tvSeries', 'tvMiniSeries'):
-        return f"imdb_type={i.typ}"
-    if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
-        return f"imdb_type={i.typ}"
+def is_ko(source, i: IMDBInfo, v: Film):
+    if i is not None:
+        if not isinstance(i, IMDBInfo):
+            raise ValueError(i)
+        banIfTv = False
+        if isinstance(source, RtveVideo):
+            banIfTv = re_or(source.longTitle, "Sesión de tarde", flags=re.I) and re_or(source.mainTopic, "Cine internacional", flags=re.I)
+        if not banIfTv:
+            banIfTv = not i.awards and i.countries and "ESP" not in i.countries
+        if i.typ in ('tvEpisode', 'tvSeries', 'tvMiniSeries'):
+            return f"imdb_type={i.typ}"
+        if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
+            return f"imdb_type={i.typ}"
+    if "Comedia" not in v.genres and (v.get_rate() or 999) < 4:
+        if re.search(r"\bSEAL", v.description):
+            return f"rate={v.get_rate()} temática SEAL"
+        if v.filmaffinity:
+            obj = R.safe_get_dict(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{v.filmaffinity.id}.json")
+            genres = (obj or {}).get("genres") or []
 
 
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:

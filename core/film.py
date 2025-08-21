@@ -18,9 +18,12 @@ class IMDb(NamedTuple):
     rate: float
     votes: int
 
+    def get_url(self) -> str:
+        return f"https://www.imdb.com/es-es/title/{self.id}"
+
     def to_html(self) -> str:
         title = self.get_title()
-        html = f'<a class="imdb" title="{title}" href="https://www.imdb.com/es-es/title/{self.id}">IMDb'
+        html = f'<a class="imdb" title="{title}" href="{self.get_url()}">IMDb'
         #if self.rate:
         #    html += f' <span class="imdbRate">{self.rate}</span>'
         html += '</a>'
@@ -54,8 +57,8 @@ class FilmAffinity(NamedTuple):
     def build(cls, id: int):
         if id is None:
             return None
-        obj = R.safe_get_json(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{id}.json")
-        if not isinstance(obj, dict):
+        obj = R.safe_get_dict(f"https://s-nt-s.github.io/imdb-sql/filmaffinity/{id}.json")
+        if not obj:
             return cls(id=id)
 
         rate = _parse_num(obj.get("rate"))
@@ -68,9 +71,12 @@ class FilmAffinity(NamedTuple):
             reviews=reviews
         )._fix()
 
+    def get_url(self) -> str:
+        return f"https://www.filmaffinity.com/es/film{self.id}.html"
+
     def to_html(self) -> str:
         title = self.get_title()
-        html = f'<a class="filmaffinity" title="{title}" href="https://www.filmaffinity.com/es/film{self.id}.html">FM'
+        html = f'<a class="filmaffinity" title="{title}" href="{self.get_url()}">FM'
         #if self.rate:
         #    html += f' <span class="filmaffinityRate">{self.rate}</span>'
         html += '</a>'
@@ -140,6 +146,12 @@ class Film(NamedTuple):
         return f"{self.source} - {pr}"
 
     def get_score(self):
+        url = None
+        if self.filmaffinity:
+            url = self.filmaffinity.get_url()
+        elif self.imdb:
+            url = self.imdb.get_url()
+
         if self.filmaffinity and self.filmaffinity.rate is not None:
             return Score(
                 source="FilmAffinity",
@@ -147,6 +159,7 @@ class Film(NamedTuple):
                 rate=self.filmaffinity.rate,
                 reviews=self.filmaffinity.reviews,
                 original=self.filmaffinity.rate,
+                url=url
             )
         if self.imdb and self.imdb.rate is not None:
             return Score(
@@ -154,13 +167,21 @@ class Film(NamedTuple):
                 votes=self.imdb.votes,
                 rate=_parse_num(round(max(0.5, self.imdb.rate-1), 2)),
                 original=self.imdb.rate,
+                url=url
             )
         return Score(
-                source="none",
-                votes=None,
-                rate=None,
-                original=None,
-            )
+            source="none",
+            votes=None,
+            rate=None,
+            original=None,
+            url=url
+        )
+
+    def get_rate(self):
+        s = self.get_score()
+        if s is None or s.rate is None:
+            return None
+        return s.rate
 
 
 class Score(NamedTuple):
@@ -169,13 +190,16 @@ class Score(NamedTuple):
     rate: float
     original: float
     reviews: int = None
+    url: str = None
 
     def to_html(self) -> str:
         title = self.get_title()
         if self.rate is None:
+            if self.url:
+                return f'<a title="{title}" class="score score_{self.source.lower()}" href="{self.url}">⭐ –</a>'
             return f'<span title="{title}" class="score score_{self.source.lower()}">⭐ –</span>'
         i = round(self.rate)
-        return f'<span title="{title}" class="score score_{self.source.lower()}">⭐ {i}</span>'
+        return f'<a title="{title}" class="score score_{self.source.lower()}" href="{self.url}">⭐ {i}</a>'
 
     def get_title(self) -> str:
         if self.rate is None:

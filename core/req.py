@@ -66,6 +66,7 @@ class Req:
                 logger.warning(f"{url} {str(e)}")
             return None
 
+    @cache
     def safe_get_list_dict(self, url: str) -> list[dict]:
         js = self.safe_get_json(url)
         if not isinstance(js, list):
@@ -77,6 +78,7 @@ class Req:
                 return []
         return js
 
+    @cache
     def safe_get_dict(self, url: str) -> dict:
         js = self.safe_get_json(url)
         if not isinstance(js, dict):

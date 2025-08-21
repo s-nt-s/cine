@@ -173,15 +173,19 @@ function ifLocal() {
     const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
+    const flm = i.querySelector("a.filmaffinity");
     if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href, 1)}.json`));
     if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
+    if (flm) p.append(" ", mkA(`https://s-nt-s.github.io/imdb-sql/filmaffinity/${gId(flm.href, 1).replace(/\D/g, "")}.json`));
   })
   document.querySelectorAll("div.film.eFilm").forEach(i=>{
     const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const efilm = i.querySelector("a.title");
+    const flm = i.querySelector("a.filmaffinity");
     if (efilm) p.append(" ", mkA(`../rec/efilm/ficha/${gId(efilm.href, 2)}.json`));
     if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
+    if (flm) p.append(" ", mkA(`https://s-nt-s.github.io/imdb-sql/filmaffinity/${gId(flm.href, 1).replace(/\D/g, "")}.json`));
   })
 }
 
