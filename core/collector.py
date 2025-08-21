@@ -183,7 +183,7 @@ def iter_films():
         imdb = info_imdb.get(v.imdb) or IMDBInfo(
             id=v.imdb,
         )
-        yield v, imdb, Film(
+        f = Film(
             source="eFilm",
             id=v.id,
             url=v.get_url(),
@@ -209,6 +209,17 @@ def iter_films():
             genres=v.genres,
             provider=v.provider
         )
+        if False and imdb.id == EFilm.CONSOLIDATED.get(v.id):
+            if imdb.year:
+                f = f._replace(year=imdb.year)
+            if imdb.duration:
+                f = f._replace(duration=imdb.duration)
+            x = IMDB.get_from_omdbapi(imdb.id, autocomplete=False)
+            if isinstance(x, dict):
+                poster = x.get('Poster')
+                if isinstance(poster, str) and poster.startswith("http"):
+                    f = f._replace(img=poster)
+        yield v, imdb, f
 
 
 def is_ko(source, i: IMDBInfo, v: Film):
@@ -225,14 +236,11 @@ def is_ko(source, i: IMDBInfo, v: Film):
         if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
             return f"imdb_type={i.typ}"
     rate = v.get_rate() or 999
-    if rate < 5 and v.year > 1980:
+    if rate < 4 and v.year > 1980:
         fm = FilmM.get(v.filmaffinity.id if v.filmaffinity else None)
         genres = set(fm.genres if fm else tuple())
         if not genres.intersection(("Serie B", "Película de culto")):
-            if rate < 4:
-                return f"rate={rate}"
-            if rate < 5 and genres.intersection(("Slasher", "Terrorismo", "Infantil", "Cine familiar")):
-                return f"rate={rate} fm_genres={tuple(genres)}"
+            return f"rate={rate}"
 
 
 def get_rtve_img(v: RtveVideo, imdb_info: IMDBInfo) -> str:

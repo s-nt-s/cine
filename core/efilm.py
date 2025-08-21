@@ -11,6 +11,8 @@ from core.util import tp_split
 import re
 from core.dblite import DB
 from core.filemanager import DictFile, FM
+from types import MappingProxyType
+
 
 
 logger = logging.getLogger(__name__)
@@ -92,8 +94,9 @@ def _g_date(dt: str):
 
 
 class EFilm:
+    CONSOLIDATED = MappingProxyType(FM.load("cache/efilm.dct.txt"))
+
     def __init__(self, origin: str, min_duration=50):
-        self.__cache: dict[int, str] = FM.load("cache/efilm.dct.txt")
         self.__new_cache = DictFile("cache/efilm.new.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
@@ -232,7 +235,7 @@ class EFilm:
                 countries=_to_tuple(*coun),
                 created=_g_date(ficha.get('created')),
                 expire=_g_date(ficha.get('expire')),
-                imdb=self.__cache.get(i['id']) or self.__new_cache.get(i['id'])
+                imdb=EFilm.CONSOLIDATED.get(i['id']) or self.__new_cache.get(i['id'])
             )
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
