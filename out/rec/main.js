@@ -260,6 +260,16 @@ function addExpirationInfo() {
 document.addEventListener(
   "DOMContentLoaded",
   () => {
+    document.querySelectorAll("img[data-fallback]").forEach(img=>{
+      const fallback = (img.getAttribute("data-fallback")??"").trim();
+      if (fallback.length == 0) return;
+      img.addEventListener("error", () => {
+        const src = (img.getAttribute("src")??"").trim();
+        if (src === fallback) return;
+        console.log(img.src, "->", fallback);
+        img.src = fallback;
+      })
+    })
     addExpirationInfo();
     setOrder();
     ifLocal();

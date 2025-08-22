@@ -70,7 +70,10 @@ def simplify(s: str):
     s = re_sp.sub(" ", s)
     s = re_sp.sub("-", s)
     s = re.sub(r"-+", "-", s)
-    return s.strip()
+    s = s.strip()
+    if s.startswith("pelicula-de-"):
+        return s[12:]
+    return s
 
 
 def jinja_quote_plus(s: str):

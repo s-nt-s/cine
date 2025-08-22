@@ -64,6 +64,9 @@ class FilmAffinityApi:
         obj = self.__get(id)
         if not isinstance(obj, dict):
             return None
+        poster = obj.get('poster')
+        if poster in ("https://www.filmaffinity.com/images/noimglg.jpg", ):
+            poster = None
         return FilmAffinity(
             id=id,
             title=obj.get('title'),
@@ -74,7 +77,7 @@ class FilmAffinityApi:
             reviews=obj.get('reviews'),
             country=obj.get('country') or tuple(),
             genres=obj.get('genres') or tuple(),
-            poster=obj.get('poster')
+            poster=poster
         )
 
     @DictCache(

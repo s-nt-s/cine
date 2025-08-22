@@ -1,6 +1,9 @@
 from core.imdb import IMDB
 from core.util import safe_index
 from functools import cache
+from core.film import Film
+from core.filmaffinity import FilmM
+from core.util import re_or
 import logging
 import re
 
@@ -48,13 +51,17 @@ STANDARDIZATION = {
     "misterio": "suspense",
     "crimen": "suspense",
     "aventuras": "acción",
+    "artes marciales": "acción",
     "policíaco": "suspense",
     "policiaco": "suspense",
     "intriga": "suspense",
     "biografía": "biográfico",
     "fantasía": "fantástico",
     "familiar": "infantil",
-    "familia": "infantil"
+    "familia": "infantil",
+    "cine familiar": "infantil",
+    'película de culto': 'película de culto',
+    'serie b': 'serie b'
 }
 
 RM_GENRE = (
@@ -69,7 +76,10 @@ RM_GENRE = (
     'cine europeo',
     'cine internacional',
     'social',
-    'cultura'
+    'cultura',
+    'arte',
+    'película de culto',
+    'serie b'
 )
 
 
@@ -116,36 +126,67 @@ def _get_from_omdb(imdb: str):
     return tuple(sorted(gnr))
 
 
-def fix_genres(genres: tuple[str, ...], imdb: str = None, url: str = None):
-    gnr: set[str] = set(_get_from_omdb(imdb))
-    nrm: set[str] = set(_standarize(*genres, url=url))
+def _get_from_filmaffinity(id: int):
+    if id is None:
+        return tuple()
+    film = FilmM.get(id)
+    if film is None or not film.genres:
+        return tuple()
+    known = set(RM_GENRE).union(STANDARDIZATION.keys()).union(STANDARDIZATION.values())
+    gnr: set[str] = set()
+    for g in map(str.lower, film.genres):
+        if g in known:
+            gnr.add(g)
+            continue
+        if re_or(g, "^comedia"):
+            gnr.add("comedia")
+        if re_or(g, "^documental"):
+            gnr.add("documental")
+        if re_or(g, "animación"):
+            gnr.add("animación")
+        if re_or(g, "^drama", 'melodrama'):
+            gnr.add("drama")
+        if re_or(g, "thriller"):
+            gnr.add("suspense")
+    gnr = _standarize(*gnr, url=f"https://www.filmaffinity.com/es/film{id}.html")
+    gnr = set(gnr).intersection(STANDARDIZATION.values())
+    return tuple(sorted(gnr))
 
-    if ("documental" in nrm and len(gnr) == 0) or "documental" in gnr:
+
+def fix_genres(f: Film):
+    film: set[str] = set(_get_from_filmaffinity(f.filmaffinity.id if f.filmaffinity else None))
+    imdb: set[str] = set(_get_from_omdb(f.imdb.id if f.imdb else None))
+    main: set[str] = set(_standarize(*f.genres, url=f.url))
+
+    fml_mdb = film.union(imdb)
+    if "documental" in fml_mdb or (len(fml_mdb) == 0 and "documental" in main):
         return ("Documental", )
-    nrm.discard("documental")
+    main.discard("documental")
 
     hasGen: dict[str, bool] = {}
     for g in ("acción", "drama", "infantil"):
-        hasGen[g] = (g in nrm) or (g in gnr)
-        gnr.discard(g)
-        nrm.discard(g)
+        hasGen[g] = (g in main) or (g in imdb) or (g in film)
+        imdb.discard(g)
+        main.discard(g)
+        film.discard(g)
 
     for k, dup in {
         "biográfico": ("histórico", )
     }.items():
-        for st in (nrm, gnr):
+        for st in (main, imdb, film):
             if k in st:
                 st.difference_update(dup)
-
-    if len(nrm) == 0:
-        nrm = gnr
-    elif gnr:
-        nrm = set(nrm).intersection(gnr) or gnr
-    if len(nrm) == 0:
+    if len(film) > 0:
+        main = film
+    elif len(main) == 0:
+        main = imdb
+    elif imdb:
+        main = set(main).intersection(imdb) or imdb
+    if len(main) == 0:
         for k, b in hasGen.items():
             if b is True:
                 return (k.capitalize(), )
 
     def_index = len(ORDER)
-    genres = sorted(nrm, key=lambda g: (safe_index(ORDER, g, def_index), g))
+    genres = sorted(main, key=lambda g: (safe_index(ORDER, g, def_index), g))
     return tuple(map(str.capitalize, genres))

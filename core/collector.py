@@ -2,7 +2,6 @@ from core.rtve import Rtve, Video as RtveVideo
 from core.efilm import EFilm, Video as EFilmVideo
 from core.imdb import IMDB, IMDBInfo
 from core.film import Film, IMDb, FilmAffinity
-from core.req import R
 from core.wiki import WIKI
 from core.util import re_or, get_first, tp_uniq
 from core.country import CF
@@ -12,7 +11,6 @@ from core.filemanager import FM
 import re
 import logging
 from datetime import date
-from functools import cache
 from core.filmaffinity import FilmM
 
 logger = logging.getLogger(__name__)
@@ -42,9 +40,8 @@ def get_films():
         if ko:
             logger.debug(f"{v.url} descartado por {ko}")
             continue
-        imdbId = v.imdb.id if v.imdb else None
         v = complete_film(v)
-        v = v._replace(genres=fix_genres(v.genres, imdbId, v.url))
+        v = v._replace(genres=fix_genres(v))
         arr.append(v)
     films: list[Film] = []
     imdb_film: dict[str, set[Film]] = defaultdict(set)
@@ -113,6 +110,7 @@ def complete_film(v: Film):
         v = v._replace(year=film_obj.year or v.year)
         v = v._replace(title=film_obj.title or v.title)
         if v.source == "eFilm" and film_obj.poster:
+            v = v._replace(fallback=v.img)
             v = v._replace(img=film_obj.poster)
     elif imdb_obj:
         v = v._replace(year=imdb_obj.get("Year") or v.year)

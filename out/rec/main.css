@@ -129,6 +129,7 @@ span.genre {
   padding: 0.2em 0.5em;
   border-radius: 0.5em;
   font-size: 0.9em;
+  height: 100%;
 }
 span.drama {
   background-color: #2B4C7E; /* azul oscuro, serio */
@@ -174,6 +175,12 @@ span.fantastico {
 }
 span.animacion {
   background-color: #FF8C00; /* naranja vivo, energía y diversión */
+}
+span.culto {
+  background-color: #4B0082; /* índigo profundo, místico/exclusivo */
+}
+span.serie-b {
+  background-color: #FF1493; /* rosa fucsia fuerte, kitsch */
 }
 
 abbr.duration {
@@ -353,6 +360,7 @@ body.cuadricula span.list-view {
   display: flex !important;
 }
 .score {
+  display: inline-block;
   font-weight: bold;
   font-family: Arial, sans-serif;
   padding: 0.2em 0.5em;
@@ -360,6 +368,7 @@ body.cuadricula span.list-view {
   font-size: 0.9em;
   color: white;
   text-decoration: none;
+  height: 100%;
 }
 .score_filmaffinity {
   background-color: #4B8BBE;

@@ -123,7 +123,9 @@ genres_unicode = {
     "oeste": "🤠",         # Oeste
     "romantico": "❤️",     # Romántico
     "suspense": "🕵️",     # Suspense
-    "terror": "👻"         # Terror
+    "terror": "👻",         # Terror
+    "serie-b": "💾",
+    "culto": "💎"
 }
 for g in map(simplify, genres.keys()):
     if g not in genres_unicode:

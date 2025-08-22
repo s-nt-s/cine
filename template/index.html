@@ -66,7 +66,7 @@
       {% for f in fl %}
       <div class="film {{f.source}} {{f.get_provider()|simplify}} {%for g in f.genres %}{{g|simplify}} {%endfor%} {%for c in f.country %}{{c.spa|simplify}} {%endfor%}" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
-        <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
+        <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster" {%if f.fallback%}data-fallback="{{f.fallback}}"{%endif%}/></a>
           <p class="botonera">
             {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
             {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}

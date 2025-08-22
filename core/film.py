@@ -105,6 +105,7 @@ class Film(NamedTuple):
     imdb: Optional[IMDb] = None
     provider: str = None
     alt: tuple["Film", ...] = tuple()
+    fallback: Optional[str] = None
 
     def get_provider(self):
         if self.source.lower() == "rtve":
