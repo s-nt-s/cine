@@ -240,7 +240,7 @@ def is_ko(source, i: IMDBInfo, v: Film):
         if banIfTv and rate < 5 and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
             return f"imdb_type={i.typ}"
     rate = v.get_rate() or 999
-    if rate < 4 and v.year > 1980:
+    if rate < 4 and v.year >= 1980:
         fm = FilmM.get(v.filmaffinity.id if v.filmaffinity else None)
         genres = set(fm.genres if fm else tuple())
         if not genres.intersection(("Serie B", "Película de culto")):

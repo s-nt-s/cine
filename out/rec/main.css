@@ -360,15 +360,18 @@ body.cuadricula span.list-view {
   display: flex !important;
 }
 .score {
+  --border: 2px;
   display: inline-block;
   font-weight: bold;
   font-family: Arial, sans-serif;
-  padding: 0.2em 0.5em;
+  padding: calc(0.2em - var(--border)) calc(0.5em -  var(--border));
   border-radius: 0.5em;
   font-size: 0.9em;
   color: white;
   text-decoration: none;
   height: 100%;
+  background-color: #4B8BBE;
+  color: #FFD700;
 }
 .score_filmaffinity {
   background-color: #4B8BBE;
@@ -380,6 +383,13 @@ body.cuadricula span.list-view {
 }
 .score_none {
   background-color: grey;
+  border: var(--border) solid grey;
+}
+a.score[href*="filmaffinity"] {
+  border: var(--border) solid #4B8BBE;
+}
+a.score[href*="imdb"] {
+  border: var(--border) solid #b38600;
 }
 a.imdb, a.filmaffinity {
   display: none;
