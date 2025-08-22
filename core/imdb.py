@@ -190,7 +190,7 @@ class IMDBApi:
         return merge
 
     @cache
-    def get_from_omdbapi(self, id: str, autocomplete=True):
+    def get_from_omdbapi(self, id: str, autocomplete=True) -> dict | None:
         if id in (None, ""):
             return None
         if not isinstance(id, str):

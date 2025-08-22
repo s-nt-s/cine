@@ -125,7 +125,7 @@ class Rtve(Web):
 
     def __init__(self, *args, **kwargv):
         self.__cache = DictFile("cache/rtve.dct.txt")
-        self.__log = DictFile("cache/rtve.log.dct.txt")
+        self.__new = DictFile("cache/rtve.new.dct.txt")
         super().__init__(*args, **kwargv)
 
     @cached_property
@@ -180,16 +180,21 @@ class Rtve(Web):
         ids_ko = self.__get_ids(*Rtve.BAN_IDS)
         for ficha_id in sorted(ids):
             if ficha_id not in ids_ko:
-                ficha = self.get_ficha(ficha_id)
-                v = self.__ficha_to_video(ficha, id_li.get(ficha_id))
-                if v is not None:
-                    col[v.id].add(v)
+                v = self.get_video(ficha_id, id_li.get(ficha_id))
+                if v is None or self.__is_ko(v):
+                    continue
+                if v.idImdb is None:
+                    v = v._replace(
+                        idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director, v.duration)
+                    )
+                    self.__cache.set(v.id, v.idImdb)
+                col[v.id].add(v)
         arr: set[Video] = set()
         for v in col.values():
             arr.add(self.__merge(v))
         videos = tuple(sorted(arr, key=lambda r: r.id))
         self.__cache.dump()
-        self.__log.dump()
+        self.__new.dump()
         logger.info(f"{len(videos)} recuperados de rtve")
         return videos
 
@@ -220,10 +225,11 @@ class Rtve(Web):
                     v1[k] = tuple(old)
         return Video(**v1)
 
-    def __ficha_to_video(self, ficha: dict, li: Tag = None):
+    def get_video(self, ficha_id: int, li: Tag = None):
+        ficha = self.get_ficha(ficha_id)
         idAsset = dict_walk(ficha, 'id', instanceof=(int, type(None)))
         ficha_idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
-        self.__log.set(idAsset, ficha_idImdb)
+        self.__new.set(idAsset, ficha_idImdb)
 
         img_vertical, img_horizontal, img_others = self.__get_imgs_from_ficha(ficha, li)
 
@@ -259,13 +265,6 @@ class Rtve(Web):
             genres=self.__get_genres_from_ficha(ficha),
             description=self.__get_description(url, ficha),
         )
-        if self.__is_ko(v):
-            return None
-        if v.idImdb is None:
-            v = v._replace(
-                idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director, v.duration)
-            )
-            self.__cache.set(idAsset, v.idImdb)
         return v
 
     def __get_genres_from_ficha(self, ficha: dict):

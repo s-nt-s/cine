@@ -96,7 +96,7 @@ def _g_date(dt: str):
 class EFilm:
     CONSOLIDATED = MappingProxyType(FM.load("cache/efilm.dct.txt"))
 
-    def __init__(self, origin: str, min_duration=50):
+    def __init__(self, origin: str = 'https://cinemadrid.efilm.online', min_duration=50):
         self.__new_cache = DictFile("cache/efilm.new.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
@@ -194,49 +194,57 @@ class EFilm:
         js = mapdict(_clean_js, js, compact=True)
         return js
 
+    def get_video(self, id: int, i: dict = None):
+        if i is None:
+            i = dict()
+        elif i['id'] != id:
+            raise ValueError(i)
+        ficha = self.get_ficha(id)
+        lang = []
+        subt = []
+        coun = []
+        for ln in (ficha.get('languages') or []):
+            if not isinstance(ln, dict):
+                raise ValueError(ln)
+            lang.append((ln.get('language') or {}).get('code_iso3'))
+            subt.append((ln.get('subtitle') or {}).get('code_iso3'))
+        for ct in (ficha.get('countries') or []):
+            if not isinstance(ct, dict):
+                raise ValueError(ct)
+            coun.append(ct.get('code'))
+        year = ficha.get('year') or i.get('year')
+        v = Video(
+            id=id,
+            name=_clean_name(i.get("name") or ficha.get('name'), year),
+            slug=i.get('slug'),
+            typ=i.get('type'),
+            cover=ficha.get('cover') or i.get("cover"),
+            cover_horizontal=i.get('cover_horizontal'),
+            actors=tuple(i.get('actors') or []),
+            duration=i.get('duration'),
+            year=year,
+            genres=tuple(x['name'] for x in (i.get('genres') or [])),
+            description=i.get('description'),
+            covers=tuple(x['cover'] for x in (i.get('covers') or [])),
+            director=tp_split("/", i.get('director_name')),
+            banner_main=i.get('banner_main'),
+            banner_trailer=i.get('banner_trailer'),
+            provider_slug=i.get('provider_slug'),
+            provider=(i.get('provider') or {}).get('name'),
+            gamma=(i.get('gamma') or {}).get('name_show'),
+            lang=_to_tuple(*lang, exclude=('mud', 'mis')),
+            subtitle=_to_tuple(*subt, exclude=('mis', )),
+            countries=_to_tuple(*coun),
+            created=_g_date(ficha.get('created')),
+            expire=_g_date(ficha.get('expire')),
+            imdb=EFilm.CONSOLIDATED.get(id) or self.__new_cache.get(id)
+        )
+        return v
+
     def get_videos(self):
         arr: set[Video] = set()
         for i in self.get_items():
-            ficha = self.get_ficha(i['id'])
-            lang = []
-            subt = []
-            coun = []
-            for ln in (ficha.get('languages') or []):
-                if not isinstance(ln, dict):
-                    raise ValueError(ln)
-                lang.append((ln.get('language') or {}).get('code_iso3'))
-                subt.append((ln.get('subtitle') or {}).get('code_iso3'))
-            for ct in (ficha.get('countries') or []):
-                if not isinstance(ct, dict):
-                    raise ValueError(ct)
-                coun.append(ct.get('code'))
-            year = i['year']
-            v = Video(
-                id=i['id'],
-                name=_clean_name(i.get('name'), year),
-                slug=i['slug'],
-                typ=i['type'],
-                cover=i.get('cover'),
-                cover_horizontal=i.get('cover_horizontal'),
-                actors=tuple(i.get('actors') or []),
-                duration=i['duration'],
-                year=year,
-                genres=tuple(x['name'] for x in (i.get('genres') or [])),
-                description=i.get('description'),
-                covers=tuple(x['cover'] for x in (i.get('covers') or [])),
-                director=tp_split("/", i.get('director_name')),
-                banner_main=i.get('banner_main'),
-                banner_trailer=i.get('banner_trailer'),
-                provider_slug=i.get('provider_slug'),
-                provider=(i.get('provider') or {}).get('name'),
-                gamma=(i.get('gamma') or {}).get('name_show'),
-                lang=_to_tuple(*lang, exclude=('mud', 'mis')),
-                subtitle=_to_tuple(*subt, exclude=('mis', )),
-                countries=_to_tuple(*coun),
-                created=_g_date(ficha.get('created')),
-                expire=_g_date(ficha.get('expire')),
-                imdb=EFilm.CONSOLIDATED.get(i['id']) or self.__new_cache.get(i['id'])
-            )
+            v = self.get_video(i['id'], i)
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue

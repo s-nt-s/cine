@@ -265,10 +265,18 @@ class DictFile:
     def get(self, k: int, default=None):
         return self.__data.get(k, default)
 
+    def discard(self, k: int):
+        self.__data.pop(k, None)
+
     def set(self, k: int, v: str):
         if isinstance(v, str):
             self.__data[k] = v
 
+    def items(self):
+        return self.__data.items()
+
+    def keys(self):
+        return self.__data.keys()
+
 
 FM = FileManager()
-
