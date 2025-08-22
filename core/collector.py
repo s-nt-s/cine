@@ -87,20 +87,35 @@ def complete_film(v: Film):
         v = v._replace(expiration=None)
     if v.imdb is None or v.imdb.id is None:
         logger.debug(f"NO_IMDB {v.url}")
-        return v._replace(imdb=None)
-    elif v.filmaffinity is None:
+        v = v._replace(imdb=None)
+    if v.imdb is not None and v.filmaffinity is None:
         logger.debug(f"NO_FILMAFFINITY https://www.imdb.com/es-es/title/{v.imdb.id}")
-    if v.casting and v.director and v.genres:
+    if v.imdb is None:
         return v
-    x = IMDB.get_from_omdbapi(v.imdb.id, autocomplete=False)
-    if not isinstance(x, dict):
+    if v.id not in {
+        "rtve": Rtve.CONSOLIDATED,
+        "eFilm": EFilm.CONSOLIDATED
+    }.get(v.source, {}):
         return v
+    imdb_obj = IMDB.get_from_omdbapi(v.imdb.id, autocomplete=False)
+    film_obj = FilmM.get(v.filmaffinity.id if v.filmaffinity else None)
+    if not isinstance(imdb_obj, dict) and not isinstance(film_obj, FilmAffinity):
+        return v
+    if imdb_obj is None:
+        imdb_obj = {}
     if not v.casting:
-        v = v._replace(casting=tp_uniq(x.get('Actors')))
+        v = v._replace(casting=tp_uniq(imdb_obj.get('Actors')))
     if not v.director:
-        v = v._replace(director=tp_uniq(x.get('Director')))
+        v = v._replace(director=tp_uniq(imdb_obj.get('Director')))
     if not v.genres:
-        v = v._replace(genres=tp_uniq(x.get('Genre')))
+        v = v._replace(genres=tp_uniq(imdb_obj.get('Genre')))
+    if film_obj:
+        v = v._replace(year=film_obj.year or v.year)
+        v = v._replace(title=film_obj.title or v.title)
+        if v.source == "eFilm" and film_obj.poster:
+            v = v._replace(img=film_obj.poster)
+    elif imdb_obj:
+        v = v._replace(year=imdb_obj.get("Year") or v.year)
     return v
 
 
@@ -209,16 +224,6 @@ def iter_films():
             genres=v.genres,
             provider=v.provider
         )
-        if False and imdb.id == EFilm.CONSOLIDATED.get(v.id):
-            if imdb.year:
-                f = f._replace(year=imdb.year)
-            if imdb.duration:
-                f = f._replace(duration=imdb.duration)
-            x = IMDB.get_from_omdbapi(imdb.id, autocomplete=False)
-            if isinstance(x, dict):
-                poster = x.get('Poster')
-                if isinstance(poster, str) and poster.startswith("http"):
-                    f = f._replace(img=poster)
         yield v, imdb, f
 
 

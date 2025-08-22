@@ -11,8 +11,9 @@ from core.util import dict_walk, trim, re_or, mapdict, tp_split, dict_walk_posit
 import re
 from functools import cache
 from typing import NamedTuple
-from core.filemanager import DictFile
+from core.filemanager import DictFile, FM
 from core.dblite import DB
+from types import MappingProxyType
 
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ class Video(NamedTuple):
 
 
 class Rtve(Web):
+    CONSOLIDATED: MappingProxyType[int, str] = MappingProxyType(FM.load("cache/rtve.dct.txt"))
     JSONS = (
         'https://recomsys.rtve.es/recommendation/tops?source=apps&recoId=tve-peliculas&contentType=video&size=999',
     )
@@ -124,7 +126,6 @@ class Rtve(Web):
     )
 
     def __init__(self, *args, **kwargv):
-        self.__cache = DictFile("cache/rtve.dct.txt")
         self.__new = DictFile("cache/rtve.new.dct.txt")
         super().__init__(*args, **kwargv)
 
@@ -181,19 +182,18 @@ class Rtve(Web):
         for ficha_id in sorted(ids):
             if ficha_id not in ids_ko:
                 v = self.get_video(ficha_id, id_li.get(ficha_id))
-                if v is None or self.__is_ko(v):
+                if v is None:
                     continue
                 if v.idImdb is None:
                     v = v._replace(
                         idImdb=DB.search_imdb_id(v.title, v.productionDate, v.director, v.duration)
                     )
-                    self.__cache.set(v.id, v.idImdb)
+                    self.__new.set(v.id, v.idImdb)
                 col[v.id].add(v)
         arr: set[Video] = set()
         for v in col.values():
             arr.add(self.__merge(v))
         videos = tuple(sorted(arr, key=lambda r: r.id))
-        self.__cache.dump()
         self.__new.dump()
         logger.info(f"{len(videos)} recuperados de rtve")
         return videos
@@ -228,6 +228,8 @@ class Rtve(Web):
     def get_video(self, ficha_id: int, li: Tag = None):
         ficha = self.get_ficha(ficha_id)
         idAsset = dict_walk(ficha, 'id', instanceof=(int, type(None)))
+        if idAsset != ficha_id:
+            raise ValueError(ficha)
         ficha_idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
         self.__new.set(idAsset, ficha_idImdb)
 
@@ -246,7 +248,7 @@ class Rtve(Web):
             img_horizontal=img_horizontal,
             img_others=img_others,
             productionDate=dict_walk(ficha, 'productionDate', instanceof=(int, type(None))),
-            idImdb=self.__cache.get(idAsset, ficha_idImdb),
+            idImdb=Rtve.CONSOLIDATED.get(idAsset, ficha_idImdb),
             typeName=dict_walk(ficha, 'type/name', instanceof=(str, type(None))),
             subTypeName=dict_walk(ficha, 'subType/name', instanceof=(str, type(None))),
             director=tuple(dict_walk(ficha, 'director', instanceof=(list, type(None))) or []),
@@ -265,6 +267,8 @@ class Rtve(Web):
             genres=self.__get_genres_from_ficha(ficha),
             description=self.__get_description(url, ficha),
         )
+        if self.__is_ko(v):
+            return None
         return v
 
     def __get_genres_from_ficha(self, ficha: dict):

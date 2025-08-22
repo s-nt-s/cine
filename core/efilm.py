@@ -94,7 +94,7 @@ def _g_date(dt: str):
 
 
 class EFilm:
-    CONSOLIDATED = MappingProxyType(FM.load("cache/efilm.dct.txt"))
+    CONSOLIDATED: MappingProxyType[int, str] = MappingProxyType(FM.load("cache/efilm.dct.txt"))
 
     def __init__(self, origin: str = 'https://cinemadrid.efilm.online', min_duration=50):
         self.__new_cache = DictFile("cache/efilm.new.dct.txt")
