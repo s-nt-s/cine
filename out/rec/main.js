@@ -269,7 +269,7 @@ document.addEventListener(
         console.log(img.src, "->", fallback);
         img.src = fallback;
       })
-    })
+    });
     addExpirationInfo();
     setOrder();
     ifLocal();

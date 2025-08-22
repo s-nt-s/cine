@@ -236,7 +236,8 @@ def is_ko(source, i: IMDBInfo, v: Film):
             banIfTv = not i.awards and i.countries and "ESP" not in i.countries
         if i.typ in ('tvEpisode', 'tvSeries', 'tvMiniSeries'):
             return f"imdb_type={i.typ}"
-        if banIfTv and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
+        rate = v.get_rate() or 0
+        if banIfTv and rate < 5 and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
             return f"imdb_type={i.typ}"
     rate = v.get_rate() or 999
     if rate < 4 and v.year > 1980:
