@@ -8,6 +8,9 @@ from core.rtve import Rtve as RtveApi
 from core.efilm import EFilm as EfilmApi
 from core.imdb import IMDB
 from core.util import get_first
+import requests
+from functools import cache
+from core.web import WEB
 
 
 class Item(NamedTuple):
@@ -22,6 +25,19 @@ class Row(NamedTuple):
     id: int
     imdb: str
     items: tuple[Item, ...]
+
+
+@cache
+def is_image_url_alive(url: str, timeout: int = 5) -> str | None:
+    if url is None:
+        return None
+    try:
+        resp = requests.head(url, timeout=timeout, allow_redirects=True)
+        # Debe devolver 200 y un content-type de imagen
+        if resp.status_code == 200 and resp.headers.get("Content-Type", "").startswith("image/"):
+            return url
+    except requests.RequestException:
+        return None
 
 
 def load_dct(*files: str, ok_file: str = None):
@@ -44,11 +60,11 @@ def load_dct(*files: str, ok_file: str = None):
 
 rtve = load_dct(
     "cache/rtve.log.dct.txt",
-    ok="cache/rtve.dct.txt",
+    ok_file="cache/rtve.dct.txt",
 )
 efilm = load_dct(
-    "cache/efilm.dct.txt",
     "cache/efilm.new.dct.txt",
+    ok_file="cache/efilm.dct.txt",
 )
 imdb_ids = tuple(sorted(set(efilm.values()).union(set(rtve.values()))))
 imdb: dict[str, dict] = {r['id']: r for r in DB.to_tuple(f"""
@@ -79,9 +95,17 @@ for r_id, i_id in rtve.items():
         year=r.productionDate,
         title=(r.title, )
     ))
+    imdb_url = f"https://www.imdb.com/es-es/title/{i_id}/"
+    imdb_img = is_image_url_alive(i.get('Poster'))
+    if imdb_img is None:
+        soup = WEB.get_cached_soup(imdb_url)
+        if soup:
+            n = soup.select_one("div[class*='ipc-poster'] img[class='ipc-image']")
+            if n:
+                imdb_img = n.attrs["src"]
     items.append(Item(
-        url=f"https://www.imdb.com/es-es/title/{i_id}/",
-        poster=i.get('Poster'),
+        url=imdb_url,
+        poster=imdb_img,
         year=imdb[i_id].get('year') or i['Year'],
         title=tuple(imdb_title.get(i_id, set())) or (i['Title'], ),
     ))
