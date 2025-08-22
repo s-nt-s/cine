@@ -59,14 +59,14 @@ def load_dct(*files: str, ok_file: str = None):
 
 
 rtve = load_dct(
-    "cache/rtve.log.dct.txt",
+    "cache/rtve.new.dct.txt",
     ok_file="cache/rtve.dct.txt",
 )
 efilm = load_dct(
     "cache/efilm.new.dct.txt",
     ok_file="cache/efilm.dct.txt",
 )
-imdb_ids = tuple(sorted(set(efilm.values()).union(set(rtve.values()))))
+imdb_ids = tuple(sorted(set(efilm.values()).union(set(rtve.values())))) + ('', )
 imdb: dict[str, dict] = {r['id']: r for r in DB.to_tuple(f"""
     select
         *
