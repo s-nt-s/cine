@@ -194,6 +194,8 @@ class Rtve(Web):
         for v in col.values():
             arr.add(self.__merge(v))
         videos = tuple(sorted(arr, key=lambda r: r.id))
+        for k in Rtve.CONSOLIDATED.keys():
+            self.__new.discard(k)
         self.__new.dump()
         logger.info(f"{len(videos)} recuperados de rtve")
         return videos
