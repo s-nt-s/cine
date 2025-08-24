@@ -148,6 +148,7 @@ class FileManager:
             makedirs(file.parent, exist_ok=True)
             with open(file, "wb") as f:
                 f.write(r.content)
+        return file
 
     def load_json(self, file, *args, **kwargs):
         with open(file, "r") as f:
@@ -205,7 +206,9 @@ class FileManager:
         for tp in map(str.split, map(str.strip, re.split(r"\n+", txt.strip()))):
             if len(tp) != 2:
                 continue
-            obj[int(tp[0])] = tp[1]
+            obj[tp[0]] = tp[1]
+        if all(map(str.isdecimal, obj.keys())):
+            obj = {int(k): v for k, v in obj.items()}
         return obj
 
     def dump_dct(self, file, obj, *args, **kwargs):
@@ -257,18 +260,18 @@ class DictFile:
     def __init__(self, file: str):
         self.__file = file
         path = FM.resolve_path(file)
-        self.__data: dict[int, str] = FM.load(file) if path.is_file() else {}
+        self.__data: dict[int | str, str] = FM.load(file) if path.is_file() else {}
 
     def dump(self):
         FM.dump(self.__file, self.__data)
 
-    def get(self, k: int, default=None):
+    def get(self, k: int | str, default=None):
         return self.__data.get(k, default)
 
-    def discard(self, k: int):
+    def discard(self, k: int | str):
         self.__data.pop(k, None)
 
-    def set(self, k: int, v: str):
+    def set(self, k: int | str, v: str):
         if isinstance(v, str):
             self.__data[k] = v
 
