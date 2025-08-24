@@ -164,14 +164,21 @@ def fix_genres(f: Film):
     main.discard("documental")
 
     hasGen: dict[str, bool] = {}
-    for g in ("acción", "drama", "infantil"):
+    for g in ("infantil", ):  # "acción", "drama"
         hasGen[g] = (g in main) or (g in imdb) or (g in film)
         imdb.discard(g)
         main.discard(g)
         film.discard(g)
 
     for k, dup in {
-        "biográfico": ("histórico", )
+        "biográfico": ("histórico", "drama"),
+        "suspense": ("drama", "acción"),
+        "oeste": ("drama", "acción", "histórico"),
+        "acción": ("drama", ),
+        "bélico": ("drama", "acción"),
+        "histórico": ("drama", "acción"),
+        "terror": ("drama", "acción"),
+        "ciencia ficción": ("fantástico", )
     }.items():
         for st in (main, imdb, film):
             if k in st:

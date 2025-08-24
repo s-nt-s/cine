@@ -96,8 +96,10 @@ providers: dict[str, int] = {}
 for f in films:
     providers[f.get_provider()] = providers.get(f.get_provider(), 0) + 1
 providers = dict(sorted(providers.items(), key=lambda kv: _sort_provider(kv[0])))
+count_genres: dict[tuple[str, ...], int] = dict()
 genres: dict[str, int] = {}
 for f in films:
+    count_genres[f.genres] = count_genres.get(f.genres, 0) + 1
     for g in f.genres:
         genres[g] = genres.get(g, 0) + 1
 genres = dict(sorted(genres.items()))
@@ -154,6 +156,7 @@ j.save(
 )
 
 FM.dump("out/films.json", films)
-
+for g, c in sorted(count_genres.items(), key=lambda kv: (-kv[1], kv[0])):
+    logger.debug(f"{c} x {g}")
 
 print("Fin")
