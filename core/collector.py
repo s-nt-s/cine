@@ -95,6 +95,11 @@ class Collector:
             v = v._replace(publication=old_publication)
         self.__publication.set(k_film, v.publication)
 
+        if len(v.country) != 1 and v.filmaffinity and v.filmaffinity.id:
+            flm = FilmM.get(v.filmaffinity.id)
+            ct = CF.to_country(flm.country if flm else None)
+            if ct:
+                v = v._replace(country=(ct, ))
         v = v._replace(
             casting=tp_uniq(v.casting),
             director=tp_uniq(v.director),

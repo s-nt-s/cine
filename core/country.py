@@ -191,6 +191,8 @@ class CountryFinder:
         return None
 
     def to_country(self, alpha3: str) -> Country:
+        if alpha3 is None:
+            return None
         if re.match(r"^[A-Z]$", alpha3):
             raise ValueError(f"Código país no válido: {alpha3}")
         if len(alpha3) == 2:
