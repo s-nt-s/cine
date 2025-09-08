@@ -237,7 +237,7 @@ class EFilm:
             countries=_to_tuple(*coun),
             created=_g_date(ficha.get('created')),
             expire=_g_date(ficha.get('expire')),
-            imdb=EFilm.CONSOLIDATED.get(id) or self.__new_cache.get(id)
+            imdb=EFilm.CONSOLIDATED.get(id, self.__new_cache.get(id))
         )
         return v
 
@@ -248,7 +248,7 @@ class EFilm:
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
                 continue
-            if v.imdb is None:
+            if v.id not in EFilm.CONSOLIDATED and v.imdb is None:
                 imdb = DB.search_imdb_id(v.name, v.year, v.director, v.duration)
                 if imdb:
                     v = v._replace(imdb=imdb)

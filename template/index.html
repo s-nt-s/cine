@@ -84,7 +84,7 @@
           <p><b>{{f.director|yjoin}}</b>{%if f.casting %} || <span>{{f.casting|yjoin}}</span>{% endif %}</p>
           <p>{{f.description}}</p>
           {%if f.alt %}
-          <p>Otras versiones:{%for x in f.alt%} <a href="{{x.url}}">{{x.get_provider()}}</a>{%endfor%}</p>
+          <p>Otras versiones:{%for x in f.alt%}{% if loop.index>1 %},{%endif%} <a href="{{x.url}}">{{x.get_provider()}}</a>{%endfor%}</p>
           {%endif%}
       </div>
       {% endfor %}

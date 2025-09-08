@@ -206,8 +206,11 @@ class FileManager:
         for tp in map(str.split, map(str.strip, re.split(r"\n+", txt.strip()))):
             if len(tp) != 2:
                 continue
-            obj[tp[0]] = tp[1]
-        if all(map(str.isdecimal, obj.keys())):
+            k, v = tp
+            if v == "null":
+                v = None
+            obj[k] = v
+        if all(map(lambda x: x is None or x.isdecimal(), obj.keys())):
             obj = {int(k): v for k, v in obj.items()}
         return obj
 
@@ -216,7 +219,9 @@ class FileManager:
             return
         lns = []
         for k, v in sorted(obj.items()):
-            if v is not None:
+            if v is None:
+                lns.append(f"{k} null")
+            else:
                 lns.append(f"{k} {v}")
         txt = "\n".join(lns)
         self.dump_txt(file, txt)
