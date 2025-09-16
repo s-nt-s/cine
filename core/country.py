@@ -3,7 +3,7 @@ import logging
 from typing import NamedTuple
 from pycountry.db import Country as DBCountry
 from pycountry import countries as DBCountries, historic_countries
-from core.util import get_first
+from core.util import get_first, TypeException
 
 import re
 
@@ -104,6 +104,15 @@ class CountryFinder:
         return None
 
     def alpha2_to_alpha3(self, alpha2: str) -> str | None:
+        if alpha2 is None:
+            return None
+        if not isinstance(alpha2, str):
+            raise TypeException("alpha2", str, alpha2)
+        ap3 = {
+            "UK": "GBR"
+        }.get(alpha2)
+        if ap3 is not None:
+            return ap3
         for c in (
             DBCountries.get(alpha_2=alpha2),
             historic_countries.get(alpha_2=alpha2)
@@ -113,6 +122,10 @@ class CountryFinder:
         return None
 
     def alpha3_to_alpha2(self, alpha3: str) -> str | None:
+        if alpha3 is None:
+            return None
+        if not isinstance(alpha3, str):
+            raise TypeException("alpha3", str, alpha3)
         for c in (
             DBCountries.get(alpha_3=alpha3),
             historic_countries.get(alpha_3=alpha3)
@@ -124,6 +137,8 @@ class CountryFinder:
     def parse_alpha3(self, cod: str, silent: bool = False) -> str | None:
         if cod in (None, '', 'N/A'):
             return None
+        if not isinstance(cod, str):
+            raise TypeException("cod", str, cod)
         if cod in CUSTOM_ALIASES.keys():
             return cod
         for k, v in CUSTOM_ALIASES.items():
@@ -158,9 +173,11 @@ class CountryFinder:
                         return c
         return None
 
-    def to_alpha_3(self, s: str):
+    def to_alpha_3(self, s: str, silent: bool = False):
         if s is None:
             return None
+        if not isinstance(s, str):
+            raise TypeException("param", str, s)
         s = re_sp.sub(" ", s).strip()
         if s in ('', 'N/A'):
             return None
@@ -174,7 +191,8 @@ class CountryFinder:
             cod = self.__parse_alpha3(s)
             if cod is not None:
                 return cod
-        self.__log_error(f"País no encontrado: {s}")
+        if not silent:
+            self.__log_error(f"País no encontrado: {s}")
         return None
 
     @property
@@ -193,6 +211,8 @@ class CountryFinder:
     def to_country(self, alpha3: str) -> Country:
         if alpha3 is None:
             return None
+        if not isinstance(alpha3, str):
+            raise TypeException("alpha3", str, alpha3)
         if re.match(r"^[A-Z]$", alpha3):
             raise ValueError(f"Código país no válido: {alpha3}")
         if len(alpha3) == 2:
@@ -222,22 +242,22 @@ class CountryFinder:
             alpha_3=alpha3,
         )._fix()
 
-    def to_alpha_3_uniq_tp(self, arr) -> tuple[str, ... ]:
+    def to_alpha_3_uniq_tp(self, arr) -> tuple[str, ...]:
         if arr is None:
             return tuple()
         if not isinstance(arr, (list, tuple)):
-            raise ValueError(arr)
+            raise TypeException("arr", "list|tuple", arr)
         val: list[str] = []
         for v in map(self.to_alpha_3, arr):
             if v is not None and v not in val:
                 val.append(v)
         return tuple(val)
 
-    def to_country_uniq_tp(self, arr) -> tuple[str, ... ]:
+    def to_country_uniq_tp(self, arr) -> tuple[str, ...]:
         if arr is None:
             return tuple()
         if not isinstance(arr, (list, tuple)):
-            raise ValueError(arr)
+            raise TypeException("arr", "list|tuple", arr)
         val: list[str] = []
         for v in map(self.to_country, arr):
             if v is not None and v not in val:

@@ -75,7 +75,7 @@ class FilmAffinityApi:
             rate=obj.get('rate'),
             votes=obj.get('votes'),
             reviews=obj.get('reviews'),
-            country=obj.get('country') or tuple(),
+            country=obj.get('country'),
             genres=obj.get('genres') or tuple(),
             poster=poster
         )

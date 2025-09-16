@@ -31,6 +31,13 @@ block = heads + ("p", "div", "table", "article")
 inline = ("span", "strong", "i", "em", "u", "b", "del")
 
 
+class TypeException(TypeError):
+    def __init__(self, name: str, tp: Type | str, val):
+        if isinstance(tp, type):
+            tp = tp.__name__
+        super().__init__(f"{name} must be {tp}, but it is {type(val)}: {val}")
+
+
 def dict_walk(obj: Union[Dict, List, None], path: str, instanceof: Union[None, Type, Tuple[Type, ...]] = None):
     raise_if_not_found = False
     if instanceof is not None:
