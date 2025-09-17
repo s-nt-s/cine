@@ -226,7 +226,7 @@ class EFilm:
             duration=i.get('duration'),
             year=year,
             genres=tuple(x['name'] for x in (i.get('genres') or [])),
-            description=clean_html(i.get('description')),
+            description=clean_html(i.get('description'), unwrap="b strong"),
             covers=tuple(x['cover'] for x in (i.get('covers') or [])),
             director=tp_split("/", i.get('director_name')),
             banner_main=i.get('banner_main'),

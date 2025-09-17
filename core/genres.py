@@ -166,7 +166,7 @@ def fix_genres(f: Film):
     main.discard("documental")
 
     hasGen: dict[str, bool] = {}
-    for g in ("infantil", ):  # "acción", "drama"
+    for g in ("infantil", "teatro"):  # "acción", "drama"
         hasGen[g] = (g in main) or (g in imdb) or (g in film)
         imdb.discard(g)
         main.discard(g)

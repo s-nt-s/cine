@@ -155,12 +155,15 @@ def get_a_href(n: Tag):
     return href
 
 
-def clean_html(html: str | Tag):
+def clean_html(html: str | Tag, unwrap: str = None):
     if html is None:
         return None
     if isinstance(html, Tag):
         html = str(html)
     soup = BeautifulSoup(html, "html.parser")
+    if unwrap:
+        for n in soup.select(unwrap):
+            n.unwrap()
     for div in soup.select("div, p"):
         txt = get_text(div)
         if txt is None and not div.select_one("img"):
