@@ -167,10 +167,14 @@ def clean_html(html: str | Tag, unwrap: str = None):
         if unwrap:
             for n in soup.select(unwrap):
                 n.unwrap()
-        for div in soup.select("div, p"):
+        for div in soup.select(", ".join(block)):
             txt = get_text(div)
             if txt is None and not div.select_one("img"):
                 div.extract()
+        for n in soup.select(", ".join(inline)):
+            txt = get_text(n)
+            if txt is None and not n.select_one("img"):
+                n.unwrap()
         html = str(soup)
         r = re.compile(r"(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
         html = r.sub(r"</a>\1", html)
@@ -206,6 +210,8 @@ def clean_html(html: str | Tag, unwrap: str = None):
         html = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
         html = re.sub(r"\s*<br/?>\s*</p>", "</p>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
         html = re.sub(r"\n\s*\n+", r"\n", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\s*<br/?>\s*$", "", html, flags=re.MULTILINE)
+        html = re.sub(r"^\s*<br/?>\s*", "", html, flags=re.MULTILINE)
         html = html.strip()
     return html
 
