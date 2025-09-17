@@ -14,6 +14,7 @@ from typing import NamedTuple
 from core.filemanager import DictFile, FM
 from core.dblite import DB
 from types import MappingProxyType
+from core.util import clean_html
 
 
 logger = logging.getLogger(__name__)
@@ -359,7 +360,11 @@ class Rtve(Web):
         description = arr[0]
         if description[0]+description[-1] != "<>":
             return description
-        soup = buildSoup(url, description, parser="html.parser")
+        soup = buildSoup(
+            url,
+            clean_html(description),
+            parser="html.parser"
+        )
         for n in soup.select("strong, p"):
             txt = get_text(n)
             if not txt:

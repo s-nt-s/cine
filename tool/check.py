@@ -137,7 +137,7 @@ for e_id, i_id in efilm.items():
     ))
     items.append(Item(
         url=f"https://www.imdb.com/es-es/title/{i_id}/",
-        poster=i.get('Poster'),
+        poster=i.get('Poster') if i else None,
         year=imdb[i_id].get('year') or i['Year'],
         title=tuple(imdb_title.get(i_id, set())) or (i['Title'], ),
     ))

@@ -12,7 +12,7 @@ import re
 from core.dblite import DB
 from core.filemanager import DictFile, FM
 from types import MappingProxyType
-
+from core.util import clean_html
 
 
 logger = logging.getLogger(__name__)
@@ -181,6 +181,8 @@ class EFilm:
             arr.append("director=None")
         if year > 1960 and duration < self.__min_duration:
             arr.append(f'year={year} duration={duration}')
+        elif provider in ('teatrix', 'Teatrix') and duration < self.__min_duration:
+            arr.append(f'provider={provider} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
         if provider in ('Mondo', "Miguel Rodríguez arias", "Alex Quiroga"): #'Azteca'):
@@ -224,7 +226,7 @@ class EFilm:
             duration=i.get('duration'),
             year=year,
             genres=tuple(x['name'] for x in (i.get('genres') or [])),
-            description=i.get('description'),
+            description=clean_html(i.get('description')),
             covers=tuple(x['cover'] for x in (i.get('covers') or [])),
             director=tp_split("/", i.get('director_name')),
             banner_main=i.get('banner_main'),

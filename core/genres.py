@@ -61,7 +61,8 @@ STANDARDIZATION = {
     "familia": "infantil",
     "cine familiar": "infantil",
     'película de culto': 'película de culto',
-    'serie b': 'serie b'
+    'serie b': 'serie b',
+    'teatro': 'teatro',
 }
 
 RM_GENRE = (
@@ -99,6 +100,7 @@ ORDER = (
     "acción",
     "drama",
     "animación",
+    'teatro'
 )
 
 

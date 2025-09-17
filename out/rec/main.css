@@ -182,6 +182,10 @@ span.culto {
 span.serie-b {
   background-color: #FF1493; /* rosa fucsia fuerte, kitsch */
 }
+span.teatro {
+  background-color: #800020; /* burdeos oscuro, telón de teatro */
+  color: #FFD700; /* dorado, contraste elegante */
+}
 
 abbr.duration {
   white-space: nowrap;
