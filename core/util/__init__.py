@@ -170,41 +170,40 @@ def clean_html(html: str | Tag):
     h = r.sub(r"</a>\1", h)
     for t in tag_concat:
         r = re.compile(
-            "</" + t + r">(\s*)<" + t + ">", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"</" + t + r">(\s*)<" + t + r">", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\1", h)
     for t in tag_round:
         r = re.compile(
-            "(<" + t + r">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"(<" + t + r">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\2\1", h)
         r = re.compile(
-            "(<" + t + r" [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"(<" + t + r" [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\2\1", h)
         r = re.compile(
-            r"(\s+)(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"(\s+)(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\2\1", h)
     for t in tag_trim:
         r = re.compile(
-            "(<" + t + ">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"(<" + t + r">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\1", h)
         r = re.compile(
-            "\s+(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\1", h)
     for t in tag_right:
         r = re.compile(
-            "\s+(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\1", h)
         r = re.compile(
-            "(<" + t + ">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
+            r"(<" + t + r">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
         h = r.sub(r"\1", h)
     r = re.compile(
         r"\s*(<meta[^>]+>)\s*", re.MULTILINE | re.DOTALL | re.UNICODE)
     h = r.sub(r"\n\1\n", h)
-    r = re.compile(r"\n\n+", re.MULTILINE | re.DOTALL | re.UNICODE)
     h = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", h,
                flags=re.MULTILINE | re.DOTALL | re.UNICODE)
     h = re.sub(r"\s*<br/?>\s*</p>", "</p>", h,
                flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub(r"\n", h)
+    h = re.sub(r"\n\s*\n+", r"\n", h, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
     return h
 
 
