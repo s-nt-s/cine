@@ -160,54 +160,54 @@ def clean_html(html: str | Tag, unwrap: str = None):
         return None
     if isinstance(html, Tag):
         html = str(html)
-    soup = BeautifulSoup(html, "html.parser")
-    if unwrap:
-        for n in soup.select(unwrap):
-            n.unwrap()
-    for div in soup.select("div, p"):
-        txt = get_text(div)
-        if txt is None and not div.select_one("img"):
-            div.extract()
-    h = str(soup)
-    r = re.compile(r"(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub(r"</a>\1", h)
-    for t in tag_concat:
-        r = re.compile(
-            r"</" + t + r">(\s*)<" + t + r">", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\1", h)
-    for t in tag_round:
-        r = re.compile(
-            r"(<" + t + r">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\2\1", h)
-        r = re.compile(
-            r"(<" + t + r" [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\2\1", h)
-        r = re.compile(
-            r"(\s+)(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\2\1", h)
-    for t in tag_trim:
-        r = re.compile(
-            r"(<" + t + r">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\1", h)
-        r = re.compile(
-            r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\1", h)
-    for t in tag_right:
-        r = re.compile(
-            r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\1", h)
-        r = re.compile(
-            r"(<" + t + r">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub(r"\1", h)
-    r = re.compile(
-        r"\s*(<meta[^>]+>)\s*", re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub(r"\n\1\n", h)
-    h = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", h,
-               flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = re.sub(r"\s*<br/?>\s*</p>", "</p>", h,
-               flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = re.sub(r"\n\s*\n+", r"\n", h, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    return h
+    bak = ''
+    while bak != html:
+        bak = html
+        soup = BeautifulSoup(html, "html.parser")
+        if unwrap:
+            for n in soup.select(unwrap):
+                n.unwrap()
+        for div in soup.select("div, p"):
+            txt = get_text(div)
+            if txt is None and not div.select_one("img"):
+                div.extract()
+        html = str(soup)
+        r = re.compile(r"(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = r.sub(r"</a>\1", html)
+        for t in tag_concat:
+            r = re.compile(
+                r"</" + t + r">(\s*)<" + t + r">", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        for t in tag_round:
+            r = re.compile(
+                r"(<" + t + r">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+            r = re.compile(
+                r"(<" + t + r" [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+            r = re.compile(
+                r"(\s+)(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+        for t in tag_trim:
+            r = re.compile(
+                r"(<" + t + r">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+            r = re.compile(
+                r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        for t in tag_right:
+            r = re.compile(
+                r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+            r = re.compile(
+                r"(<" + t + r">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        html = re.sub(r"\s*(<meta[^>]+>)\s*", r"\n\1\n", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\s*<br/?>\s*</p>", "</p>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\n\s*\n+", r"\n", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = html.strip()
+    return html
 
 
 def simplify_html(html: str):
