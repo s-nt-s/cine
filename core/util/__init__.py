@@ -11,6 +11,8 @@ from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 from collections import Counter
 from os import environ
+from markdownify import markdownify as html_to_md
+from markdown import markdown as md_to_html
 
 import uuid
 
@@ -162,11 +164,17 @@ def clean_html(html: str | Tag, unwrap: str = None):
         html = str(html)
     bak = ''
     while bak != html:
-        bak = html
+        bak = str(html)
         soup = BeautifulSoup(html, "html.parser")
-        if unwrap:
-            for n in soup.select(unwrap):
-                n.unwrap()
+        s_unwrap = set(re.split(r"\s*,\s*") for r in (unwrap or ""))
+        s_unwrap.discard('')
+        s_unwrap.add("font")
+        for n in soup.select(", ".join(s_unwrap)):
+            n.unwrap()
+        for a in soup.select("a"):
+            href = a.attrs.get("href")
+            if href in (None, "", "#"):
+                a.unwrap()
         for div in soup.select(", ".join(block)):
             txt = get_text(div)
             if txt is None and not div.select_one("img"):
@@ -175,6 +183,14 @@ def clean_html(html: str | Tag, unwrap: str = None):
             txt = get_text(n)
             if txt is None and not n.select_one("img"):
                 n.unwrap()
+        for n in soup.find_all(block + inline):
+            chls = n.select(":scope > *")
+            if len(chls) != 1:
+                continue
+            c = chls[0]
+            if c.name != n.name or get_text(c) != get_text(n):
+                continue
+            n.unwrap()
         html = str(soup)
         r = re.compile(r"(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
         html = r.sub(r"</a>\1", html)
@@ -213,60 +229,20 @@ def clean_html(html: str | Tag, unwrap: str = None):
         html = re.sub(r"\s*<br/?>\s*$", "", html, flags=re.MULTILINE)
         html = re.sub(r"^\s*<br/?>\s*", "", html, flags=re.MULTILINE)
         html = html.strip()
+        html = minify(
+            html,
+            do_not_minify_doctype=True,
+            ensure_spec_compliant_unquoted_attribute_values=True,
+            keep_spaces_between_attributes=True,
+            keep_html_and_head_opening_tags=True,
+            keep_closing_tags=True,
+            minify_js=True,
+            minify_css=True,
+            remove_processing_instructions=True
+        )
+        markdown_text = html_to_md(html_text)
+        html_back = md_to_html(markdown_text)
     return html
-
-
-def simplify_html(html: str):
-    while True:
-        new_html = __simplify_html(html)
-        if new_html == html:
-            return new_html
-        html = new_html
-
-
-def __simplify_html(html: str):
-    html = re_sp.sub(" ", html)
-    html = minify(
-        html,
-        do_not_minify_doctype=True,
-        ensure_spec_compliant_unquoted_attribute_values=True,
-        keep_spaces_between_attributes=True,
-        keep_html_and_head_opening_tags=True,
-        keep_closing_tags=True,
-        minify_js=True,
-        minify_css=True,
-        remove_processing_instructions=True
-    )
-    blocks = ("html", "head", "body", "style", "script", "meta", "p", "div", "main", "header", "footer",
-              "table", "tr", "tbody", "thead", "tfoot" "ol", "li", "ul", "h1", "h2", "h3", "h4", "h5", "h6")
-    html = re.sub(r"<(" + "|".join(blocks) +
-                  "\b)([^>]*)>", r"\n<\1\2>\n", html)
-    html = re.sub(r"</(" + "|".join(blocks) + ")>", r"\n</\1>\n", html)
-    html = re.sub(r"\n\n+", r"\n", html).strip()
-    soup = BeautifulSoup("<faketag>"+html+"<faketag>", "html.parser")
-    for n in soup.findAll(["span", "font"]):
-        n.unwrap()
-    for a in soup.findAll("a"):
-        href = a.attrs.get("href")
-        if href in (None, "", "#"):
-            a.unwrap()
-    useful = ("href", "src", "alt", "title")
-    for n in tuple(soup.select(":scope *")):
-        if n.attrs:
-            n.attrs = {k: v for k, v in n.attrs.items() if k in useful}
-    for n in soup.findAll(block + inline):
-        chls = n.select(":scope > *")
-        if len(chls) != 1:
-            continue
-        c = chls[0]
-        if c.name != n.name or get_text(c) != get_text(n):
-            continue
-        n.unwrap()
-    for br in soup.select("p br"):
-        br.replace_with(" ")
-    for n in soup.findAll("faketag"):
-        n.unwrap()
-    return clean_html(str(soup))
 
 
 def clean_js_obj(obj: Union[List, Dict, str]):
