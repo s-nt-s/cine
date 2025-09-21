@@ -12,11 +12,20 @@ import re
 from core.dblite import DB
 from core.filemanager import DictFile, FM
 from types import MappingProxyType
-from core.util import clean_html
+from core.util import clean_html, mk_re
 
 
 logger = logging.getLogger(__name__)
 re_sp = re.compile(r"\s+")
+TEATRO_REAL = mk_re(
+    "Teatro Real de Madrid",
+    "Teatro Real Madrid",
+    "Coro y Orquesta Titulares del Teatro Real",
+    "Coro y Orquesta del Teatro Real",
+    "My Opera Player",
+    "MyOpera Player",
+    flags=re.I
+)
 
 
 def _clean_name(s, year: int):
@@ -241,6 +250,9 @@ class EFilm:
             expire=_g_date(ficha.get('expire')),
             imdb=EFilm.CONSOLIDATED.get(id, self.__new_cache.get(id))
         )
+        if v.description and "ES" not in v.countries:
+            if TEATRO_REAL.search(v.description):
+                v = v._replace(countries=("ES", ))
         return v
 
     def get_videos(self):

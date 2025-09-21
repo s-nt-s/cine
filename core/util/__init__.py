@@ -577,3 +577,16 @@ def safe_index(lst: list[T] | tuple[T, ...], value: T, default: int) -> int:
     if value in lst:
         return lst.index(value)
     return default
+
+
+def mk_re(*args: str, flags=0):
+    arr = []
+    for a in args:
+        a = a.strip()
+        if len(a) == 0:
+            continue
+        r = r"\s+".join(map(re.escape, a.split()))
+        arr.append(r)
+    if len(arr) == 0:
+        return ValueError("No valid patterns")
+    return re.compile("|".join(arr), flags)
