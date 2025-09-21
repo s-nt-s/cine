@@ -240,8 +240,7 @@ def clean_html(html: str | Tag, unwrap: str = None):
             minify_css=True,
             remove_processing_instructions=True
         )
-        markdown_text = html_to_md(html_text)
-        html_back = md_to_html(markdown_text)
+        html = md_to_html(html_to_md(html))
     return html
 
 
