@@ -166,7 +166,7 @@ def clean_html(html: str | Tag, unwrap: str = None):
     while bak != html:
         bak = str(html)
         soup = BeautifulSoup(html, "html.parser")
-        s_unwrap = set(re.split(r"\s*,\s*") for r in (unwrap or ""))
+        s_unwrap = set(re.split(r"\s*,\s*", unwrap or ""))
         s_unwrap.discard('')
         s_unwrap.add("font")
         for n in soup.select(", ".join(s_unwrap)):
@@ -229,17 +229,6 @@ def clean_html(html: str | Tag, unwrap: str = None):
         html = re.sub(r"\s*<br/?>\s*$", "", html, flags=re.MULTILINE)
         html = re.sub(r"^\s*<br/?>\s*", "", html, flags=re.MULTILINE)
         html = html.strip()
-        html = minify(
-            html,
-            do_not_minify_doctype=True,
-            ensure_spec_compliant_unquoted_attribute_values=True,
-            keep_spaces_between_attributes=True,
-            keep_html_and_head_opening_tags=True,
-            keep_closing_tags=True,
-            minify_js=True,
-            minify_css=True,
-            remove_processing_instructions=True
-        )
         html = md_to_html(html_to_md(html))
     return html
 

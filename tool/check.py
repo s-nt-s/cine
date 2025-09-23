@@ -96,7 +96,7 @@ for r_id, i_id in rtve.items():
         title=(r.title, )
     ))
     imdb_url = f"https://www.imdb.com/es-es/title/{i_id}/"
-    imdb_img = is_image_url_alive(i.get('Poster'))
+    imdb_img = is_image_url_alive(i.get('Poster')) if i else None
     if imdb_img is None:
         soup = WEB.get_cached_soup(imdb_url)
         if soup:
