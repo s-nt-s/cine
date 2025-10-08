@@ -1,7 +1,6 @@
 import re
 from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any, TypeVar, Iterable
 from bs4 import Tag, BeautifulSoup
-from minify_html import minify
 import unicodedata
 import logging
 from unidecode import unidecode
@@ -162,8 +161,10 @@ def clean_html(html: str | Tag, unwrap: str = None):
         return None
     if isinstance(html, Tag):
         html = str(html)
+    max_tries = 3
     bak = ''
-    while bak != html:
+    while max_tries > 0 and bak != html:
+        max_tries = max_tries - 1
         bak = str(html)
         soup = BeautifulSoup(html, "html.parser")
         s_unwrap = set(re.split(r"\s*,\s*", unwrap or ""))
@@ -229,7 +230,8 @@ def clean_html(html: str | Tag, unwrap: str = None):
         html = re.sub(r"\s*<br/?>\s*$", "", html, flags=re.MULTILINE)
         html = re.sub(r"^\s*<br/?>\s*", "", html, flags=re.MULTILINE)
         html = html.strip()
-        html = md_to_html(html_to_md(html))
+        html = md_to_html(html_to_md(html, escape_misc=True))
+        html = html.strip()
     return html
 
 
