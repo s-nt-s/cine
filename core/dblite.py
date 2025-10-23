@@ -158,8 +158,10 @@ class DBlite:
             year_gap: int = 5,
             full_match: bool = False
     ) -> int | None:
+        if year is None:
+            return None
         if director is None:
-            director = None
+            director = tuple()
         id_titles = self.__search_movie_by_title(title, min_year=year-year_gap, max_year=year+year_gap, duration=duration)
         if not full_match and len(id_titles) == 1:
             return id_titles[0]
