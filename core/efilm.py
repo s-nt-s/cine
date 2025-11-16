@@ -177,6 +177,7 @@ class EFilm:
         arr: list[str] = []
         typ = i.get('type')
         provider = (i.get('provider') or {}).get('name')
+        lw_provider = (provider or "").lower()
         genres = tuple(x['name'] for x in (i.get('genres') or []))
         gamma = (i.get('gamma') or {}).get('name_show')
         duration = i.get('duration', 999999)
@@ -190,11 +191,11 @@ class EFilm:
             arr.append("director=None")
         if year > 1960 and duration < self.__min_duration:
             arr.append(f'year={year} duration={duration}')
-        elif provider in ('teatrix', 'Teatrix') and duration < self.__min_duration:
+        elif lw_provider in ('teatrix', ) and duration < self.__min_duration:
             arr.append(f'provider={provider} duration={duration}')
         #if set(genres).intersection({'Cultura', 'Documental'}):
         #    arr.append(f'genres={genres}')
-        if provider in ('Mondo', "Miguel Rodríguez arias", "Alex Quiroga", "Eugenio Monesma"): #'Azteca'):
+        if lw_provider in ('mondo', "miguel rodríguez arias", "alex quiroga", "eugenio monesma"): #'azteca'):
             arr.append(f'provider={provider}')
         return tuple(arr)
 
