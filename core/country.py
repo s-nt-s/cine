@@ -14,7 +14,7 @@ re_sp = re.compile(r"\s+")
 CUSTOM_ALIASES = {
     "FRG": ("Alemania Occidental", "West Germany"),
     "DDR": ("Alemania Oriental", "East Germany"),
-    "SUN": ("Soviet Union", "Unión soviética", "URSS"),
+    "SUN": ("Soviet Union", "Unión soviética", "URSS", "Unión Soviética (URSS)"),
     "PSE": ("Occupied Palestinian Territory",),
     "YUG": ("Yugoslavia", "Yugoslavia, (Socialist) Federal Republic of"),
     "TUR": ("Turkey", "Türkiye"),
