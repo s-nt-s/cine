@@ -53,10 +53,13 @@ class Collector:
         return tuple(sorted(ids))
 
     def get_films(self):
-        ban: tuple[str, ...] = tuple() #FM.load("cache/ban.qw.txt")
+        ban: tuple[str, ...] = FM.load("cache/ban.qw.txt")
         arr: list[Film] = []
         for source, imdb, v in self.iter_films():
             if imdb and imdb.id in ban:
+                logger.debug(f"{v.url} descartado por ban")
+                continue
+            if f"{v.source}{v.id}".lower() in ban:
                 logger.debug(f"{v.url} descartado por ban")
                 continue
             if not isinstance(v.imdb, IMDb) or not isinstance(v.imdb.id, str):
@@ -173,7 +176,23 @@ class Collector:
         rtve = Rtve().get_videos()
         eflim = EFilm(
             origin='https://cinemadrid.efilm.online',
-            min_duration=50
+            min_duration=50,
+            exclude_topis=(
+                "chile en teatrix",
+                "méxico en teatrix",
+                "perú en teatrix",
+                "carnaval en teatrix",
+                "el mejor teatro en tiempo de tango",
+                "originales teatrix",
+                "cómicos y stand-up",
+                "santiago doria - filipinas",
+                "unipersonales",
+                "entre el telón y el divan",
+                'memoria artística',
+                'documental sobre religión',
+                'documental marino',
+                'Teatro para disfrutar con los peques'
+            )
         ).get_videos()
         info_imdb = IMDB.get(*self.__get_imdb(*rtve, *eflim))
         for v in rtve:
@@ -263,12 +282,59 @@ class Collector:
             rate = v.get_rate() or 0
             if banIfTv and rate < 5 and i.typ in ('tvMovie', 'tvSpecial', 'tvShort', 'tvPilot'):
                 return f"imdb_type={i.typ}"
+        if self.__is_too_bad(v):
+            return f"rate={v.get_rate()}"
+
+    def __is_too_bad(self, v: Film):
         rate = v.get_rate() or 999
-        if rate < 4 and v.year >= 1980:
-            fm = FilmM.get(v.filmaffinity.id if v.filmaffinity else None)
-            genres = set(fm.genres if fm else tuple())
-            if not genres.intersection(("Serie B", "Película de culto")):
-                return f"rate={rate}"
+        min_rate = 5
+        if v.source == "eFilm":
+            min_rate = min_rate + 0.5
+        gnrs = set({
+            "Documental",
+            "Oeste",
+            "Biográfico",
+            "Romántico",
+            "Teatro",
+            "Terror",
+            "Animación"
+        })
+        cnts = set({
+            "ARG",
+            "DEU",
+            "FRG",  # Alemana del oeste
+            "AUS",
+            "BOL",
+            "BRA",
+            "CAN",
+            "CHL",
+            "COL",
+            "ESP",
+            "USA",
+            "GTM",
+            "MEX",
+            "GBR",
+            "RUS",
+            "URY",
+            "VEN"
+        })
+        if rate >= (min_rate + 1):
+            return False
+        fm = self.__get_filmaffinity_data(v)
+        if fm:
+            if set(fm.genres).intersection(("Serie B", "Película de culto")):
+                return False
+            if gnrs.intersection(fm.genres) or fm.country in cnts:
+                min_rate = min_rate + 1
+        elif gnrs.intersection(v.genres) and cnts.intersection(v.country):
+            min_rate = min_rate + 1
+        return rate < min_rate
+
+    def __get_filmaffinity_data(self, v: Film):
+        if v is None or v.filmaffinity is None or v.filmaffinity.id is None:
+            return tuple()
+        fm = FilmM.get(v.filmaffinity.id)
+        return fm
 
     def __get_rtve_img(self, v: RtveVideo, imdb_info: IMDBInfo) -> str:
         if v.img_vertical:

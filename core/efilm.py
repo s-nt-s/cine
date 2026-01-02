@@ -12,7 +12,7 @@ import re
 from core.dblite import DB
 from core.filemanager import DictFile, FM
 from types import MappingProxyType
-from core.util import clean_html, mk_re
+from core.util import clean_html, mk_re, plain_text
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,23 @@ TEATRO_REAL = mk_re(
     "MyOpera Player",
     flags=re.I
 )
+
+
+def lw_plain_text(s):
+    if not isinstance(s, str):
+        return None
+    s = plain_text(s)
+    if not isinstance(s, str):
+        return None
+    return s.lower()
+
+
+def tp_lw_plain_text(*args):
+    arr: list[str] = []
+    for s in map(lw_plain_text, args):
+        if s is not None and s not in arr:
+            arr.append(s)
+    return tuple(arr)
 
 
 def _clean_name(s, year: int):
@@ -105,7 +122,12 @@ def _g_date(dt: str):
 class EFilm:
     CONSOLIDATED: MappingProxyType[int, str] = MappingProxyType(FM.load("cache/efilm.dct.txt"))
 
-    def __init__(self, origin: str = 'https://cinemadrid.efilm.online', min_duration=50):
+    def __init__(
+        self,
+        origin: str = 'https://cinemadrid.efilm.online',
+        min_duration=50,
+        exclude_topis: tuple[str] = tuple()
+    ):
         self.__new_cache = DictFile("cache/efilm.new.dct.txt")
         self.__s = requests.Session()
         self.__min_duration = min_duration
@@ -116,6 +138,39 @@ class EFilm:
             'Origin': self.__origin,
             'Referer': self.__origin,
         })
+        self.__exclude_topis = tp_lw_plain_text(*exclude_topis)
+        self.__country_topics = {
+            "ESP": tp_lw_plain_text(
+                'españa en teatrix',
+                'temporada lírica en teatrix- desde el teatro real de madrid a tu casa',
+                'obras españolas que no te puedes perder'
+            ),
+            "ARG": tp_lw_plain_text(
+                'cine argentino',
+                'lo más visto de argentina en méxico'
+            ),
+            "MEX": tp_lw_plain_text(
+                'lo mejor de méxico',
+                'méxico en teatrix'
+            ),
+            "PER": tp_lw_plain_text(
+                'perú en teatrix'
+            ),
+            'CHL': tp_lw_plain_text(
+                'chile en teatrix'
+            ),
+            "GBR": tp_lw_plain_text(
+                'britanico'
+            ),
+            "USA": tp_lw_plain_text(
+                'broadway',
+                'cine independiente usa'
+            ),
+            'FRA': tp_lw_plain_text(
+                'comedia francesa',
+                'nouvelle vague'
+            )
+        }
 
     def get_json(self, url: str):
         max_tries = 3
@@ -225,10 +280,28 @@ class EFilm:
                 raise ValueError(ct)
             coun.append(ct.get('code'))
         year = ficha.get('year') or i.get('year')
+        slug = i.get('slug')
+        countries = _to_tuple(*coun)
+
+        topics: set[str] = set()
+        for tp in (ficha.get('topics') or []):
+            tp = lw_plain_text(tp.get('name'))
+            if tp in self.__exclude_topis:
+                logger.debug(f"[KO] topic={tp} {Video.mk_url(id, slug)}")
+                return None
+            topics.add(tp)
+
+        topic_countries: set[str] = set()
+        for cnt, tps in self.__country_topics.items():
+            if topics.intersection(tps):
+                topic_countries.add(cnt)
+
+        countries = tuple(sorted(topic_countries)) or countries
+
         v = Video(
             id=id,
             name=_clean_name(i.get("name") or ficha.get('name'), year),
-            slug=i.get('slug'),
+            slug=slug,
             typ=i.get('type'),
             cover=ficha.get('cover') or i.get("cover"),
             cover_horizontal=i.get('cover_horizontal'),
@@ -246,7 +319,7 @@ class EFilm:
             gamma=(i.get('gamma') or {}).get('name_show'),
             lang=_to_tuple(*lang, exclude=('mud', 'mis')),
             subtitle=_to_tuple(*subt, exclude=('mis', )),
-            countries=_to_tuple(*coun),
+            countries=countries,
             created=_g_date(ficha.get('created')),
             expire=_g_date(ficha.get('expire')),
             imdb=EFilm.CONSOLIDATED.get(id, self.__new_cache.get(id))
@@ -260,8 +333,13 @@ class EFilm:
         arr: set[Video] = set()
         for i in self.get_items():
             v = self.get_video(i['id'], i)
+            if v is None:
+                continue
             if (v.lang or v.subtitle) and 'spa' not in v.lang and 'spa' not in v.subtitle:
                 logger.debug(f"[KO] NO_SPA {v.lang} {v.subtitle} {v.get_url()}")
+                continue
+            if v.provider and v.provider.lower() == 'teatrix' and not set(v.countries).intersection({"ESP", "USA", "GBR"}):
+                logger.debug(f"[KO] provider={v.provider} countries={v.countries} {v.get_url()}")
                 continue
             if v.id not in EFilm.CONSOLIDATED and v.imdb is None:
                 imdb = DB.search_imdb_id(v.name, v.year, v.director, v.duration)
