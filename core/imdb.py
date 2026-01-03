@@ -1,4 +1,5 @@
 from requests import Session
+from requests.exceptions import JSONDecodeError
 from os import environ
 import logging
 from core.util import tp_split, mapdict, dict_walk, dict_walk_tuple, dict_walk_positive
@@ -85,7 +86,13 @@ class IMDBApi:
     def __get_from_omdbapi(self, id: str) -> dict | None:
         if not self.__omdbapi_activate:
             return None
-        js: dict = self.__s.get(self.__omdbapi+id).json()
+        url = self.__omdbapi+id
+        r = self.__s.get(url)
+        try:
+            js: dict = r.json()
+        except JSONDecodeError as e:
+            logger.critical(f"{e} en {url}")
+            return None
         isError = js.get("Error")
         response = js.get("Response")
         if isError:
