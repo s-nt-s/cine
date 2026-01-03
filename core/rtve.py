@@ -234,6 +234,8 @@ class Rtve(Web):
         if idAsset != ficha_id:
             raise ValueError(ficha)
         ficha_idImdb = dict_walk(ficha, 'idImdb', instanceof=(str, type(None)))
+        if isinstance(ficha_idImdb, str):
+            ficha_idImdb = ficha_idImdb.strip("/ ")
         self.__new.set(idAsset, ficha_idImdb)
 
         img_vertical, img_horizontal, img_others = self.__get_imgs_from_ficha(ficha, li)
