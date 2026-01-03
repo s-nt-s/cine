@@ -287,7 +287,7 @@ class Collector:
 
     def __is_too_bad(self, v: Film):
         rate = v.get_rate() or 999
-        min_rate = 5
+        min_rate = 4
         if v.source == "eFilm":
             min_rate = min_rate + 0.5
         gnrs = set({
