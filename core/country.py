@@ -25,7 +25,7 @@ CUSTOM_ALIASES = {
     "LVA": ("Letonia", ),
     "CSK": ("Checoslovaquia", "Czechoslovakia"),
     "CIV": ("Côte d&#x27;Ivoire", "Côte d’Ivoire", "Côte d'Ivoire"),
-    "VDR": ("North Vietnam", "Vietnam del norte", "Viet Nam, República Democrática de"),,
+    "VDR": ("North Vietnam", "Vietnam del norte", "Viet Nam, República Democrática de"),
     "XKS": ("XKS", "XKX", "UNK", "KOS", "YUG-KO", "Kosovo"),
 }
 
