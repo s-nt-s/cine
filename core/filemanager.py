@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 from json.decoder import JSONDecodeError
 from dataclasses import is_dataclass, asdict
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,19 @@ class FileManager:
 
         return root_file
 
-    def normalize_ext(self, ext) -> str:
+    def __get_ext(self, file: Path) -> str:
         """
         Normaliza extensiones para identificar el tipo de fichero en base a la extension
         """
-        ext = ext.lstrip(".")
+        s_file = str(file).lower()
+        for k, v in {
+            ".dct.txt": "dct",
+            ".qw.txt": "qw"
+        }.items():
+            if s_file.endswith(k):
+                return v
+
+        ext = file.suffix.lstrip(".")
         ext = ext.lower()
         return {
             "xlsx": "xls",
@@ -79,30 +88,31 @@ class FileManager:
             "sql": "txt",
             "gql": "txt",
             "htm": "html",
-            "ics": "txt"
+            "ics": "txt",
+            "svg": "txt"
         }.get(ext, ext)
 
-    def load(self, file, *args, **kargv):
+    def load(self, file, *args, **kwargs):
         """
         Lee un fichero en funcion de su extension
         Para que haya soporte para esa extension ha de exisitir una funcion load_extension
         """
         file = self.resolve_path(file)
 
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         load_fl = getattr(self, "load_"+ext, None)
         if load_fl is None:
             raise Exception(
                 "No existe metodo para leer ficheros {} [{}]".format(ext, file.name))
 
-        return load_fl(file, *args, **kargv)
+        return load_fl(file, *args, **kwargs)
 
     @cache
-    def cached_load(self, file, *args, **kargv):
-        return self.load(file, *args, **kargv)
+    def cached_load(self, file, *args, **kwargs):
+        return self.load(file, *args, **kwargs)
 
-    def dump(self, file, obj, *args, **kargv):
+    def dump(self, file, obj, *args, **kwargs):
         """
         Guarda un fichero en funcion de su extension
         Para que haya soporte para esa extension ha de exisitir una funcion dump_extension
@@ -110,14 +120,14 @@ class FileManager:
         file = self.resolve_path(file)
         makedirs(file.parent, exist_ok=True)
 
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         dump_fl = getattr(self, "dump_"+ext, None)
         if dump_fl is None:
             raise Exception(
                 "No existe metodo para guardar ficheros {} [{}]".format(ext, file.name))
 
-        dump_fl(file, obj, *args, **kargv)
+        dump_fl(file, obj, *args, **kwargs)
 
     def dwn(self, file, url, verify=True, overwrite=False, headers=None):
         """
@@ -131,47 +141,90 @@ class FileManager:
             Indica si se debe sobreescribir en caso de ya existir
         """
         file = self.resolve_path(file)
-        ext = self.normalize_ext(file.suffix)
+        ext = self.__get_ext(file)
 
         if overwrite or not file.exists():
             r = requests.get(url, verify=verify, headers=headers)
             makedirs(file.parent, exist_ok=True)
             with open(file, "wb") as f:
                 f.write(r.content)
+        return file
 
-    def load_json(self, file, *args, **kargv):
+    def load_json(self, file, *args, **kwargs):
         with open(file, "r") as f:
             try:
-                return json.load(f, *args, **kargv)
+                return json.load(f, *args, **kwargs)
             except JSONDecodeError as e:
                 raise myex(e, str(file))
 
-    def dump_json(self, file, obj, *args, indent=2, **kargv):
+    def dump_json(self, file, obj, *args, indent=2, **kwargs):
         with open(file, "w") as f:
-            json.dump(self.__parse(obj), f, *args, indent=indent, **kargv)
+            json.dump(self.__parse(obj), f, *args, indent=indent, **kwargs)
 
-    def load_html(self, file, *args, parser="lxml", **kargv):
+    def load_html(self, file, *args, parser="lxml", **kwargs):
         with open(file, "r") as f:
             return BeautifulSoup(f.read(), parser)
 
-    def dump_html(self, file, obj, *args, **kargv):
+    def dump_html(self, file, obj, *args, **kwargs):
         if isinstance(obj, (BeautifulSoup, Tag)):
             obj = str(obj)
         with open(file, "w") as f:
             f.write(obj)
 
-    def load_txt(self, file, *args, **kargv):
+    def load_txt(self, file, *args, **kwargs):
         with open(file, "r") as f:
             txt = f.read()
-            if args or kargv:
-                txt = txt.format(*args, **kargv)
+            if args or kwargs:
+                txt = txt.format(*args, **kwargs)
             return txt
 
-    def dump_txt(self, file, txt, *args, **kargv):
-        if args or kargv:
-            txt = txt.format(*args, **kargv)
+    def dump_txt(self, file, txt, *args, **kwargs):
+        if args or kwargs:
+            txt = txt.format(*args, **kwargs)
         with open(file, "w") as f:
             f.write(txt)
+
+    def load_qw(self, file, *args, **kwargs):
+        file = self.resolve_path(file)
+        if not file.is_file():
+            return tuple()
+        txt = self.load_txt(file)
+        if txt is None:
+            return tuple()
+        words = set(map(str.strip, txt.split()))
+        words.discard('')
+        return tuple(sorted(words))
+
+    def load_dct(self, file, *args, **kwargs):
+        file = self.resolve_path(file)
+        if not file.is_file():
+            return {}
+        txt = self.load_txt(file)
+        if txt is None:
+            return {}
+        obj = {}
+        for tp in map(str.split, map(str.strip, re.split(r"\n+", txt.strip()))):
+            if len(tp) != 2:
+                continue
+            k, v = tp
+            if v == "null":
+                v = None
+            obj[k] = v
+        if all(map(lambda x: x is None or x.isdecimal(), obj.keys())):
+            obj = {int(k): v for k, v in obj.items()}
+        return obj
+
+    def dump_dct(self, file, obj, *args, **kwargs):
+        if not isinstance(obj, dict):
+            return
+        lns = []
+        for k, v in sorted(obj.items()):
+            if v is None:
+                lns.append(f"{k} null")
+            else:
+                lns.append(f"{k} {v}")
+        txt = "\n".join(lns)
+        self.dump_txt(file, txt)
 
     def __parse(self, obj):
         if getattr(obj, "_asdict", None) is not None:
@@ -183,6 +236,15 @@ class FileManager:
         if isinstance(obj, dict):
             obj = {k: self.__parse(v) for k, v in obj.items()}
         return obj
+
+    def rm(self, file: str | Path):
+        file = self.resolve_path(file)
+        if not file.exists():
+            return
+        if file.is_file():
+            file.unlink()
+        elif file.is_dir():
+            file.rmdir()
 
 
 # Mejoras dinamicas en la documentacion
@@ -197,5 +259,32 @@ for mth in dir(FileManager):
             else:
                 mth.__doc__ = "Guarda "
             mth.__doc__ = mth.__doc__ + "un fichero de tipo "+ext
+
+
+class DictFile:
+    def __init__(self, file: str):
+        self.__file = file
+        path = FM.resolve_path(file)
+        self.__data: dict[int | str, str] = FM.load(file) if path.is_file() else {}
+
+    def dump(self):
+        FM.dump(self.__file, self.__data)
+
+    def get(self, k: int | str, default=None):
+        return self.__data.get(k, default)
+
+    def discard(self, k: int | str):
+        self.__data.pop(k, None)
+
+    def set(self, k: int | str, v: str):
+        if isinstance(v, str):
+            self.__data[k] = v
+
+    def items(self):
+        return self.__data.items()
+
+    def keys(self):
+        return self.__data.keys()
+
 
 FM = FileManager()

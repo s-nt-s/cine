@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html LANG="es">
+  <head>
+    <meta charset="UTF-8">
+    <title>Depuración</title>
+    <style>
+        img {
+            max-width: 100px;
+            max-height: 150px;
+        }
+    </style>
+  </head>
+  <body>
+    <table>
+        <thead>
+            <tr>
+                <th>Fuente</th>
+                <th>IMDB</th>
+                <th>Filmaffinity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <th colspan="3">{{ r.source }} <code>{{ r.id }} {{ r.imdb }} {{ r.filmaffinity }}</code></th>
+            </tr>
+            <tr>
+            {% for it in r.items %}
+                <td>
+                    <ul>
+                        <li>{{ it.year }}</li>
+                        <li><a href="{{ it.url }}">{{ it.title[0] }}</a></li>
+                        {% for t in it.title[1:] %}
+                            <li>{{ t }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            {% endfor %}
+            </tr>
+            <tr>
+            {% for it in r.items %}
+                <td>
+                    {% if it.poster %}
+                    <img src="{{ it.poster }}"/>
+                    {% endif %}
+                </td>
+            {% endfor %}
+            </tr>
+            {%endfor%}
+        </tbody>
+    </table>
+  </body>
+</html>

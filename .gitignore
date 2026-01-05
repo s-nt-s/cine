@@ -1,3 +1,7 @@
+efilm.new.dct.txt
+rtve.new.dct.txt
+*.sqlite
+*.sqlite-journal
 rec/
 out/*
 !out/rec/

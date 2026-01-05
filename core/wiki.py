@@ -1,104 +1,515 @@
-import requests
 from textwrap import dedent
-from core.util import dict_walk
-from collections import defaultdict
 import logging
-from typing import NamedTuple, Any
+from typing import Any, NamedTuple
 from functools import cache
-from os import environ
+import re
+from time import sleep
+from functools import wraps
+from core.git import G
+from core.req import R
+from collections import defaultdict
+from datetime import datetime, timedelta
+from core.util import iter_chunk
+from urllib.error import HTTPError
+from core.country import CF
+import json
+
 
 logger = logging.getLogger(__name__)
+re_sp = re.compile(r"\s+")
+LANGS = ('es', 'en', 'ca', 'gl', 'it', 'fr')
 
-PAGE_URL = environ['PAGE_URL']
-OWNER_MAIL = environ['OWNER_MAIL']
 
-
-class WikiInfo(NamedTuple):
+class WikiUrl(NamedTuple):
     url: str
-    country: tuple[str, ...]
-    filmaffinity: str | None
+    lang_code: str
+    lang_label: str
+
+    def to_html(self) -> str:
+        cls = ["wiki"]
+        title = "Wikipedia"
+        if self.lang_label:
+            title += f" en {self.lang_label}"
+        elif self.lang_code:
+            title += f" ({self.lang_code})"
+        if self.lang_code:
+            cls.append("wiki_"+self.lang_code)
+        cls_str = ' '.join(cls)
+        html = f'<a class="{cls_str}" href="{self.url}" title="{title}"'
+        if self.lang_code:
+            html += f' hreflang="{self.lang_code}"'
+        html += '>W</a>'
+        return html
+
+def _parse_wiki_val(s: str):
+    if not isinstance(s, str):
+        return s
+    s = s.strip()
+    if len(s) == 0:
+        return None
+    if s.startswith("http://www.wikidata.org/.well-known/genid/"):
+        return None
+    m = re.match(r"https?://www\.wikidata\.org/entity/(Q\d+)", s)
+    if m:
+        return f"wd:{m.group(1)}"
+    return s
+
+
+class WikiError(Exception):
+    def __init__(self, msg: str, query: str, http_code: int):
+        super().__init__(f"{msg}\n{query}")
+        self.__query = query
+        self.__msg = msg
+        self.__http_code = http_code
+
+    @property
+    def msg(self):
+        return self.__msg
+
+    @property
+    def http_code(self):
+        return self.__http_code
+
+    @property
+    def query(self):
+        return self.__query
+
+
+def retry_fetch(chunk_size=5000):
+    def decorator(func):
+        internal_cache: dict[tuple[str, str], Any] = {}
+
+        @wraps(func)
+        def wrapper(self: "WikiApi", *args, **kwargs):
+            undone = set(args).difference({None, ''})
+            if len(undone) == 0:
+                return {}
+            key_cache = json.dumps((func.__name__, kwargs), sort_keys=True)
+            result = dict()
+            for a in undone:
+                val = internal_cache.get((key_cache, a))
+                if val is not None:
+                    result[a] = val
+                    undone.discard(a)
+
+            def _log_line(rgs: tuple, kw: dict, ck: int):
+                rgs = sorted(set(rgs))
+                line = ", ".join(
+                    [f"{len(rgs)} ids [{rgs[0]} - {rgs[-1]}]"] +
+                    [f"{k}={v}" for k, v in kw.items()] +
+                    [f"chunk_size={ck}"]
+                )
+                return f"{func.__name__}({line})"
+
+            error_query = {}
+            count = 0
+            tries = 0
+            until = datetime.now() + timedelta(seconds=60*5)
+            cur_chunk_size = int(chunk_size)
+            while undone and (tries == 0 or (datetime.now() < until and tries < 3)):
+                error_query = {}
+                tries = tries + 1
+                if tries > 1:
+                    cur_chunk_size = max(1, min(cur_chunk_size, len(undone)) // 3)
+                    sleep(5)
+                logger.info(_log_line(undone, kwargs, cur_chunk_size))
+                for chunk in iter_chunk(cur_chunk_size, list(undone)):
+                    count += 1
+                    fetched: dict = None
+                    try:
+                        fetched = func(self, *chunk, **kwargs) or {}
+                        fetched = {k: v for k, v in fetched.items() if v}
+                    except WikiError as e:
+                        logger.warning(f"└ [KO] {e.msg}")
+                        if e.http_code == 429:
+                            sleep(60)
+                        elif e.http_code is not None:
+                            last_error = error_query.get(e.http_code)
+                            if last_error is None or len(last_error) > len(e.query):
+                                error_query[e.http_code] = str(e.query)
+                    if not fetched:
+                        continue
+                    for k, v in fetched.items():
+                        result[k] = v
+                        internal_cache[(key_cache, k)] = v
+                        undone.remove(k)
+                    logger.debug(f"└ [{count}] [{chunk[0]} - {chunk[-1]}] = {len(fetched)} items")
+
+            logger.info(f"{_log_line(args, kwargs, chunk_size)} = {len(result)} items")
+            for c, q in error_query.items():
+                logger.warning(f"STATUS_CODE {c} for:\n{q}")
+            return result
+
+        return wrapper
+    return decorator
 
 
 class WikiApi:
     def __init__(self):
-        self.__s = requests.Session()
         # https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy
-        self.__s.headers.update({
+        self.__headers = {
+            'User-Agent': f'ImdbBoot/0.0 ({G.remote}; {G.mail})',
+            #'Content-Type': 'application/x-www-form-urlencoded',
             "Accept": "application/sparql-results+json",
-            'User-Agent': f'CineBoot/0.0 ({PAGE_URL}; {OWNER_MAIL})'
-        })
+            'Content-Type': 'application/sparql-query'
+        }
+        self.__last_query: str | None = None
 
-    def query_sparql(self, query: str):
+    @property
+    def last_query(self):
+        return self.__last_query
+
+    def query_sparql(self, query: str) -> dict:
         # https://query.wikidata.org/
-        endpoint = "https://query.wikidata.org/sparql"
+        query = dedent(query).strip()
+        query = re.sub(r"\n(\s*\n)+", "\n", query)
+        self.__last_query = query
+        try:
+            return R.get_json(
+                "https://query.wikidata.org/sparql",
+                headers=self.__headers,
+                data=self.__last_query.encode('utf-8'),
+                wait_if_status={429: 60}
+            )
+        except Exception as e:
+            code = e.code if isinstance(e, HTTPError) else None
+            raise WikiError(str(e), self.__last_query, http_code=code) from e
 
-        r = self.__s.get(endpoint, params={"query": query})
-        r.raise_for_status()
-        return r.json()
+    def query(self, query: str) -> list[dict[str, Any]]:
+        data = self.query_sparql(query)
+        if not isinstance(data, dict):
+            raise WikiError(str(data), self.__last_query)
+        result = data.get('results')
+        if not isinstance(result, dict):
+            raise WikiError(str(data), self.__last_query)
+        bindings = result.get('bindings')
+        if not isinstance(bindings, list):
+            raise WikiError(str(data), self.__last_query)
+        for i in bindings:
+            if not isinstance(i, dict):
+                raise WikiError(str(data), self.__last_query)
+            if i.get('subject') and i.get('object'):
+                raise WikiError(str(data), self.__last_query)
+        return bindings
+
+    def get_filmaffinity(self, *args):
+        r: dict[str, int] = dict()
+        for k, v in self.get_dict(
+            *args,
+            key_field='wdt:P345',
+            val_field='wdt:P480'
+        ).items():
+            vals = set(v)
+            if len(vals) == 1:
+                r[k] = vals.pop()
+        return r
+
+    def get_director(self, *args):
+        r: dict[str, tuple[str, ...]] = dict()
+        for k, v in self.get_dict(
+            *args,
+            key_field='wdt:P345',
+            val_field='wdt:P345',
+            by_field='wdt:P57'
+        ).items():
+            if len(v):
+                r[k] = tuple(sorted(set(v)))
+        return r
+
+    def get_genres(self, *args):
+        r: dict[str, tuple[str, ...]] = dict()
+        for k, v in self.get_dict(
+            *args,
+            key_field='wdt:P345',
+            val_field='wdt:P136',
+            lang='es,en'
+        ).items():
+            if len(v):
+                r[k] = tuple(sorted(v))
+        return r
+
+    def get_names(self, *args: str) -> dict[str, str]:
+        obj = {}
+        for k, v in self.get_label_dict(*args, key_field='wdt:P345').items():
+            if len(v) == 1:
+                obj[k] = v.pop()
+        return obj
+
+    @retry_fetch(chunk_size=300)
+    def get_label_dict(self, *args, key_field: str = None, lang: tuple[str] = None) -> dict[str, list[str | int]]:
+        if not lang:
+            lang = LANGS
+
+        values = " ".join(f'"{x}"' for x in args)
+
+        lang_priority = {lg: i for i, lg in enumerate(lang, start=1)}
+        lang_filter = ", ".join(f'"{lg}"' for lg in lang_priority)
+
+        lang_case = " ".join(
+            f'IF(LANG(?v) = "{lg}", {p},' for lg, p in lang_priority.items()
+        ) + f"{(len(lang_priority) + 1)})" + (')'* (len(lang_priority)-1))
+
+        query = dedent("""
+            SELECT ?k ?v WHERE {
+                VALUES ?k { %s }
+                ?item %s ?k ;
+                    rdfs:label ?v .
+                FILTER(LANG(?v) IN (%s))
+
+                {
+                SELECT ?k (MIN(?pri) AS ?minPri) WHERE {
+                    VALUES ?k { %s }
+                    ?item %s ?k ;
+                        rdfs:label ?v .
+                    FILTER(LANG(?v) IN (%s))
+                    BIND(%s AS ?pri)
+                }
+                GROUP BY ?k
+                }
+
+                BIND(%s AS ?pri)
+                FILTER(?pri = ?minPri)
+            }
+        """).strip() % (
+            values,
+            key_field,
+            lang_filter,
+            values,
+            key_field,
+            lang_filter,
+            lang_case,
+            lang_case,
+        )
+        r = defaultdict(set)
+        for i in self.query(query):
+            k = i['k']['value']
+            v = i.get('v', {}).get('value')
+            if isinstance(v, str):
+                v = v.strip()
+            if v is None or (isinstance(v, str) and len(v) == 0):
+                continue
+            if v.isdigit():
+                v = int(v)
+            r[k].add(v)
+        r = {k: list(v) for k, v in r.items()}
+        return r
+
+    @retry_fetch(chunk_size=300)
+    def get_dict(
+        self,
+        *args,
+        key_field: str = None,
+        val_field: str = None,
+        by_field: str = None,
+        lang: str = None
+    ) -> dict[str, tuple[str | int, ...]]:
+        ids = " ".join(map(lambda x: x if x.startswith("wd:") else f'"{x}"', args))
+        if by_field:
+            query = dedent('''
+                SELECT ?k ?v WHERE {
+                    VALUES ?k { %s }
+                    ?item %s ?k ;
+                          %s ?b .
+                       ?b %s ?v .
+            ''').strip() % (
+                ids,
+                key_field,
+                by_field,
+                val_field,
+            )
+        elif key_field is None:
+            query = dedent('''
+                SELECT ?k ?v WHERE {
+                    VALUES ?k { %s }
+                    ?k %s ?v.
+            ''').strip() % (
+                ids,
+                val_field,
+            )
+        else:
+            query = dedent('''
+                SELECT ?k ?v WHERE {
+                    VALUES ?k { %s }
+                    ?item %s ?k.
+                    ?item %s ?v.
+            ''').strip() % (
+                ids,
+                key_field,
+                val_field,
+            )
+        if lang:
+            query = query.replace("SELECT ?k ?v WHERE", "SELECT ?k ?vLabel WHERE")
+            query = query + f'\n    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{lang}". }}'
+        query = query + "\n}"
+        r = defaultdict(list)
+        vKey = 'vLabel' if lang else 'v'
+        for i in self.query(query):
+            k = _parse_wiki_val(i['k']['value'])
+            v = _parse_wiki_val(i[vKey].get('value'))
+            if v is None:
+                continue
+            if v.isdigit():
+                v = int(v)
+            r[k].append(v)
+        r = {k: tuple(v) for k, v in r.items()}
+        return r
+
+    def get_alpha3(self, *args: str):
+        def _get_dict(val_field: str, *vals: str):
+            obj: dict[str, str] = {}
+            for k, v in self.get_dict(*vals, key_field=None, val_field=val_field).items():
+                set_v = set(map(CF.parse_alpha3, v))
+                set_v.discard(None)
+                if len(set_v) == 1:
+                    obj[k] = set_v.pop()
+            return obj
+
+        done: dict[str, str] = {}
+        undone = set(args)
+        for val_field in (
+            "wdt:P298",
+            "p:P298/ps:P298",
+            "wdt:P984",
+            "wdt:P11897",
+        ):
+            undone.difference_update(done.keys())
+            done.update(_get_dict(val_field, *undone))
+        return done
 
     @cache
-    def info_from_imdb(self, imdb_id: str):
-        if imdb_id is None:
-            return None
-        query = dedent("""
-            SELECT ?item ?itemLabel ?country ?countryLabel ?filmaffinity ?article WHERE {
-              ?item wdt:P345 "%s".     # IMDb ID
-              OPTIONAL {
-                ?item wdt:P495 ?country.       # País/es de origen o producción
-              }
-              OPTIONAL {
-                ?item wdt:P480 ?filmaffinity. # URL FilmAffinity
-              }
-              OPTIONAL {
-                ?article schema:about ?item ; schema:isPartOf <https://es.wikipedia.org/> .
-              }
-              OPTIONAL {
-                ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> .
-              }
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-            }
-        """).strip() % imdb_id
-        js = self.query_sparql(query)
-        bindings = dict_walk(js, 'results/bindings', instanceof=(list, type(None)))
-        if not bindings:
-            return None
+    def get_countries(self, *args: str):
+        main = self.get_dict(*args, key_field="wdt:P345", val_field="wdt:P495")
+        q_vals: set[str] = set()
+        for vls in main.values():
+            q_vals.update(vls)
 
-        vals: dict[str, Any] = defaultdict(set)
-        for b in bindings:
-            for f in ('countryLabel/value', 'filmaffinity/value', 'article/value'):
-                v = dict_walk(b, f, instanceof=(str, type(None)))
-                if isinstance(v, str):
-                    v = v.strip()
-                if v not in (None, ""):
-                    vals[f].add(v)
-        for f in ('filmaffinity/value', 'article/value'):
-            v = vals[f]
-            if len(v) != 1:
-                if len(v) > 1:
-                    logger.warning(f"{f} ambiguo para {imdb_id}: {v}")
-                vals[f] = None
+        alpha = self.get_alpha3(*q_vals)
+        main = {
+            kk: tuple(x for x in map(alpha.get, vv) if x is not None)
+            for kk, vv in main.items()
+        }
+        return main
+
+    @retry_fetch(chunk_size=300)
+    def __get_countries_from_q_lang(self, *q_lang: str):
+        query = '''
+        SELECT ?language ?country WHERE {
+            VALUES ?language { %s }
+            # O bien idioma oficial (P37)
+            { ?country wdt:P37 ?language . }
+            UNION
+            # O bien lengua hablada aquí (P2936)
+            { ?country wdt:P2936 ?language . }
+            ?country wdt:P31/wdt:P279* wd:Q3624078 .
+        }
+        ''' % " ".join(q_lang)
+        obj: dict[str, set[str]] = defaultdict(set)
+        for row in self.query(query):
+            language = _parse_wiki_val(row.get('language', {}).get('value'))
+            country = _parse_wiki_val(row.get('country', {}).get('value'))
+            if language and country:
+                obj[language].add(country)
+        rtn = {k: tuple(sorted(v)) for k, v in obj.items()}
+        return rtn
+
+    @retry_fetch(chunk_size=1000)
+    def get_wiki_url(self, *args):
+        ids = " ".join(map(lambda x: f'"{x}"', args))
+        order = []
+        for i, lang in enumerate(LANGS, start=1):
+            order.append(f'IF(CONTAINS(STR(?site), "://{lang}.wikipedia.org"), {i},')
+        len_order = len(order)
+        order.append(f"{len_order}" + (')' * len_order))
+        order_str = " ".join(order)
+
+        bindings = self.query(
+            """
+                SELECT ?imdb ?article WHERE {
+                VALUES ?imdb { %s }
+
+                ?item wdt:P345 ?imdb .
+                ?article schema:about ?item ;
+                        schema:isPartOf ?site .
+
+                FILTER(CONTAINS(STR(?site), "wikipedia.org"))
+
+                BIND(
+                    %s
+                    AS ?priority
+                )
+
+                {
+                    SELECT ?imdb (MIN(?priority) AS ?minPriority) WHERE {
+                    VALUES ?imdb { %s }
+                    ?item wdt:P345 ?imdb .
+                    ?article schema:about ?item ;
+                            schema:isPartOf ?site .
+                    FILTER(CONTAINS(STR(?site), "wikipedia.org"))
+                    BIND(
+                        %s
+                        AS ?priority
+                    )
+                    }
+                    GROUP BY ?imdb
+                }
+
+                FILTER(?priority = ?minPriority)
+                }
+                ORDER BY ?imdb
+            """ % (ids, order_str, ids, order_str)
+        )
+        obj: dict[str, set[str]] = defaultdict(set)
+        for i in bindings:
+            k = i['imdb']['value']
+            v = i.get('article', {}).get('value')
+            if isinstance(v, str):
+                v = v.strip()
+            if v is None or (isinstance(v, str) and len(v) == 0):
                 continue
-            v = v.pop()
-            if isinstance(v, str) and v.isdigit():
-                v = int(v)
-            vals[f] = v
+            obj[k].add(v)
+        obj = {k: v.pop() for k, v in obj.items() if len(v) == 1}
+        return obj
 
-        return WikiInfo(
-            url=vals['article/value'],
-            country=tuple(vals['countryLabel/value']),
-            filmaffinity=vals['filmaffinity/value']
+    @cache
+    def get_label(self, field: str, value: str, lang: str) -> str | None:
+        arr = []
+        arr.append("SELECT ?fieldLabel WHERE {")
+        arr.append("{")
+        arr.append(f'   ?field {field} "{value}".')
+        arr.append("}")
+        arr.append('SERVICE wikibase:label { bd:serviceParam wikibase:language "%s". }' % lang)
+        arr.append("}")
+        arr.append("LIMIT 1")
+        query = "\n".join(arr)
+        dt = self.query(query)
+        if isinstance(dt, list):
+            obj = dt[0]
+            if isinstance(obj, dict):
+                obj = obj.get('fieldLabel')
+                if isinstance(obj, dict):
+                    return obj.get('value')
+
+    def parse_url(self, url: str):
+        if url is None:
+            return None
+        lang = url.split("://", 1)[-1].split(".", 1)[0]
+        label = self.get_label("wdt:P218", lang, "es,en")
+        return WikiUrl(
+            url=url,
+            lang_code=lang,
+            lang_label=label
         )
 
 
 WIKI = WikiApi()
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 2:
-        print("Uso: python wiki_api.py <imdb_id>")
-        sys.exit(1)
 
-    imdb_id = sys.argv[1]
-    api = WikiApi()
-    result = api.info_from_imdb(imdb_id)
-    print(result._asdict())
+if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    import sys
+    gen: set[str] = set()
+    for k, v in WIKI.get_genres(*sys.argv[1:]).items():
+        #print(k, *v)
+        gen = gen.union(v)
+    print(*sorted(gen), sep="\n")

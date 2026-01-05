@@ -1,4 +1,12 @@
 const isLocal = ["", "localhost"].includes(document.location.hostname);
+const NOW = new Date();
+const TODAY = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate());
+const REMAIN_WEEK = TODAY.getDay()==0?0:(8-TODAY.getDay());
+const REMAIN_MONTH = (new Date(TODAY.getFullYear(), TODAY.getMonth()+1, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_MONTH_2 = (new Date(TODAY.getFullYear(), TODAY.getMonth()+2, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_YEAR = (new Date(TODAY.getFullYear()+1, 0, 1)-TODAY)/(1000*60*60*24);
+const REMAIN_YEAR_2 = (new Date(TODAY.getFullYear()+2, 0, 1)-TODAY)/(1000*60*60*24);
+
 const $$ = (slc) => Array.from(document.querySelectorAll(slc));
 const DB = new Db();
 
@@ -15,12 +23,9 @@ function chunkArray(arr, chunkSize) {
 class FormQuery {
   static ALIAS = Object.freeze({})
   static form() {
-    const d = {
-      range: {},
-    };
+    const d = {};
     document.querySelectorAll("input[id], select[id]").forEach((n) => {
       if (n.disabled) return;
-      if (/_(max|min)$/.test(n.id)) return;
       const v = getVal(n.id);
       if (v === false) return;
       const nm = n.getAttribute("name");
@@ -31,7 +36,6 @@ class FormQuery {
       }
       d[n.id] = v;
     });
-    d.range = getRanges(...FormQuery.RANGE.filter(r => (document.getElementById(r + '_min')?.disabled) === false));
     return d;
   }
   static __form_to_query() {
@@ -51,19 +55,6 @@ class FormQuery {
       }
       qr.push(k + "=" + v);
     });
-    Object.entries(form.range).forEach(([k, v]) => {
-      const n = document.getElementById(k + "_max");
-      if (
-        Number(n.getAttribute("min")) == v.min &&
-        Number(n.getAttribute("max")) == v.max
-      )
-        return;
-      if (FormQuery.RANGE.includes(k) && MX[k] != null) {
-        if (k == "price" && v.min == 0) return qr.push(k + "=" + v.max);
-        if (v.max == MX[k]) return qr.push(k + "=" + v.min);
-      }
-      qr.push(k + "=" + v.min + "-" + v.max);
-    });
     const query = qr.join("&")
     return FormQuery.REV_QUERY[query] ?? query;
   }
@@ -81,20 +72,6 @@ class FormQuery {
       if (document.getElementById(k) == null) return;
       setVal(k, v);
     });
-    const _set_rank_val = (n) => {
-      const [id, k] = n.id.split("_");
-      if (query.range == null || query.range[id] == null || query.range[id][k] == null) {
-        n.value = n.getAttribute(k);
-        return;
-      }
-      n.value = query.range[id][k];
-    }
-    $$("input[id$=_min],input[id$=_max]").forEach(_set_rank_val);
-    if (query.range)
-      Object.entries(query.range).forEach(([k, v]) => {
-        setVal(k + "_min", v["min"]);
-        setVal(k + "_max", v["max"]);
-      });
   }
   static query() {
     const search = (() => {
@@ -102,17 +79,11 @@ class FormQuery {
       if (q.length == 0) return null;
       return FormQuery.ALIAS[q] ?? q;
     })();
-    const d = {
-      range: {},
-    };
+    const d = {};
     if (search == null) return d;
     search.split("&").forEach((i) => {
       const [k, v] = FormQuery.__get_kv(i);
       if (k == null) return;
-      if (typeof v == "object") {
-        d.range[k] = v;
-        return;
-      }
       if (Array.isArray(d[k])) d[k] = v.split("+").map((t) => decodeURIComponent(t));
       else d[k] = v;
     });
@@ -126,35 +97,16 @@ class FormQuery {
     if (tmp.length == 0) return [null, null];
     if (tmp.length > 2 || tmp[0].length == 0) return [null, null];
     const k = tmp[0];
-    if (FormQuery.DEF_FLAGS.includes(k) || FormQuery.FLAGS.includes(k)) {
-      const opt = document.querySelector(
-        'select option[value="' + k + '"]'
-      );
-      return [opt.closest("select[id]").id, k];
-    }
-    if (!isNaN(Number(k))) return [null, null];
     if (tmp.length == 1) {
-      const opt = document.querySelectorAll(
-        'select option[value="' + k + '"]'
-      );
-      if (opt.length == 1) {
-        return [opt[0].closest("select[id]").id, k];
-      }
+      const opt = document.querySelector('select option[value="' + k + '"]');
+      if (opt) return [opt.closest("select[id]").id, k];
+      const inp = document.querySelector('input[value="' + k + '"]');
+      if (inp) return [inp.id, k];
       return [k, true];
     }
     let v = tmp[1];
-    if (FormQuery.RANGE.includes(k) && v.match(/^\d+$/) && MX[k] != null) {
-      v = v + '-' + MX[k];
-    }
     const n = Number(v);
     if (!isNaN(n)) return [k, n];
-    if (v.match(/^\d+-\d+$/)) {
-      const [_min, _max] = v
-        .split("-")
-        .map((i) => Number(i))
-        .sort((a, b) => a - b);
-      return [k, { min: _min, max: _max }];
-    }
     return [k, v];
   }
 }
@@ -167,21 +119,23 @@ function getVal(id) {
     console.log("No se ha encontrado #" + id);
     return null;
   }
+  const tp_val = elm.getAttribute("data-type") || elm.getAttribute("type");
+  const parseVal = (vl) => {
+    if (tp_val == "number") {
+      const num = Number(vl);
+      return isNaN(num) ? null : num;
+    }
+    return vl;
+  };
   if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
     if (elm.checked === false) return false;
     const v = elm.getAttribute("value");
-    if (v != null) return v;
+    if (v != null) return parseVal(v);
     return elm.checked;
   }
   const val = (elm.value ?? "").trim();
   if (val.length == 0) return null;
-  const tp = elm.getAttribute("data-type") || elm.getAttribute("type");
-  if (tp == "number") {
-    const num = Number(val);
-    if (isNaN(num)) return null;
-    return num;
-  }
-  return val;
+  return parseVal(val);
 }
 
 function setVal(id, v) {
@@ -192,7 +146,7 @@ function setVal(id, v) {
   }
   if (elm.tagName == "INPUT" && elm.getAttribute("type") == "checkbox") {
     if (arguments.length == 1) v = elm.defaultChecked;
-    elm.checked = v === true;
+    elm.checked = (v === true || v === elm.getAttribute("value"));
     return;
   }
   if (arguments.length == 1) {
@@ -201,37 +155,37 @@ function setVal(id, v) {
   elm.value = v;
 }
 
-function getRanges() {
-  const rgs = {};
-  Array.from(arguments).forEach((k) => {
-    let mn = getVal(k + "_min");
-    let mx = getVal(k + "_max");
-    if (mn == null || mx == null) return;
-    rgs[k] = { min: mn, max: mx };
-  });
-  return rgs;
-}
-
 function ifLocal() {
   if (!isLocal) return;
   const mkA = (url) => {
     const a = document.createElement("a");
-    const spl = url.split("/");
-    a.textContent = spl[spl.length-1];
+    const spl = url.split(/\/|\./);
+    a.textContent = spl[spl.length-2];
     a.href = url;
     return a;
   }
-  const gId = (s) => {
+  const gId = (s, x) => {
     while (s.endsWith("/")) s = s.substring(0, s.length-1);
     const spl = s.split("/");
-    return spl[spl.length-1];
+    return spl[spl.length-x];
   }
-  document.querySelectorAll("div.film").forEach(i=>{
+  document.querySelectorAll("div.film.rtve").forEach(i=>{
     const p = i.querySelector("p");
     const imdb = i.querySelector("a.imdb");
     const rtve = i.querySelector("a.title");
-    if (rtve) p.append(" ", mkA(`../rec/rtve/${gId(rtve.href)}.json`));
-    if (imdb) p.append(" ", mkA(`../rec/omdbapi/${gId(imdb.href)}.json`));
+    const flm = i.querySelector("a.filmaffinity");
+    if (rtve) p.append(" ", mkA(`../rec/rtve/ficha/${gId(rtve.href, 1)}.json`));
+    if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
+    if (flm) p.append(" ", mkA(`https://s-nt-s.github.io/imdb-sql/filmaffinity/${gId(flm.href, 1).replace(/\D/g, "")}.json`));
+  })
+  document.querySelectorAll("div.film.eFilm").forEach(i=>{
+    const p = i.querySelector("p");
+    const imdb = i.querySelector("a.imdb");
+    const efilm = i.querySelector("a.title");
+    const flm = i.querySelector("a.filmaffinity");
+    if (efilm) p.append(" ", mkA(`../rec/efilm/ficha/${gId(efilm.href, 2)}.json`));
+    if (imdb) p.append(" ", mkA(`./omdb/${gId(imdb.href, 1)}.json`));
+    if (flm) p.append(" ", mkA(`https://s-nt-s.github.io/imdb-sql/filmaffinity/${gId(flm.href, 1).replace(/\D/g, "")}.json`));
   })
 }
 
@@ -239,26 +193,84 @@ function ifLocal() {
 function setOrder() {
   const flags = new Set();
   const default_flags = new Set();
-  document.querySelectorAll('select[data-type="flag"]').forEach((s) => {
-    const arr_options = Array.from(s.options);
-    const defVal = arr_options.filter(o => o.getAttribute("selected") != null)[0].value;
+  document.querySelectorAll('input[id][type=checkbox][value],input[id][type=radio][value]').forEach((n) => {
+    const v = (n.getAttribute("value") || "").trim();
+    if (v.length == 0) return;
+    if (document.querySelectorAll('[value="'+v+"']").length > 1) return;
+    n.setAttribute("data-current", "");
+    flags.add(v);
+  });
+  document.querySelectorAll('select[id]').forEach((s) => {
+    const options = Array.from(s.options).filter(o => {
+      return document.querySelectorAll('[value="'+o.value+'"]').length == 1;
+    });
+    if (options.length != s.options.length) return;
+    const defVal = options.filter(o => o.getAttribute("selected") != null)[0].value;
     s.setAttribute("data-current", defVal);
     default_flags.add(defVal);
-    const vals = arr_options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
+    const vals = options.flatMap(o => [null, "", defVal].includes(o.value)?[]:o.value);
     vals.forEach(x => flags.add(x));
   });
   FormQuery.FLAGS = Object.freeze(Array.from(flags));
   FormQuery.DEF_FLAGS = Object.freeze(Array.from(default_flags));
 }
 
+function exp_to_msg(d) {
+  if (d<0) return ["⌛", "Ya caduco"]
+  if (d==0) return ["0d", "Caduca hoy"];
+  if (d==1) return ["1d", "Caduca mañana"];
+  if (d==2) return ["2d", "Caduca pasado mañana"];
+  if (d<=9) return [`${d}d`, `Caduca en ${d} días`];
+  if (d<=REMAIN_WEEK) return ["1s", "Caduca esta semana"];
+  if (d<=(REMAIN_WEEK+6)) return ["2s", "Caduca la semana que viene"];
+  const s = Math.floor(d/7);
+  if (s<=9) return [`${s}s`, `Caduca en ${s} semanas`];
+  if (d<=REMAIN_MONTH) return ["1m", "Caduca este mes"];
+  if (d<=REMAIN_MONTH_2) return ["2m", "Caduca el mes que viene"];
+  const m = Math.floor(d/30);
+  if (m<=9) return [`${m}m`,  `Caduca en ${m} meses`];
+  if (d<=REMAIN_YEAR) return ["1a", "Caduca este año"];
+  const y = Math.max(1, Math.floor(d/365));
+  if (d<=REMAIN_YEAR_2) return [`${y}a`, "Caduca el año que viene"];
+  if (y<=9) return [`${y}a`, `Caduca en ${y} año${y!=1?'s':''}`];
+  return ["∞",  `Caduca en ${y} años`];
+}
+
+function addExpirationInfo() {
+  if (EXPIRATION==null) return null;
+  const min_date = EXPIRATION.get('__min__');
+  if (min_date==null) return;
+  const diffMs = min_date - TODAY;
+  const min_days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  Array.from(EXPIRATION.entries()).forEach(([k, v])=>{
+    const n = document.querySelector("#"+k+" .expiration");
+    if (n==null) return;
+    const days = min_days + v;
+    const msg = exp_to_msg(days);
+    const de = n.getAttribute("data-expiration");
+    n.textContent = msg[0].toLocaleLowerCase();
+    n.title = msg[1]+" ("+de.substring(0, 10)+")";
+    if (msg[0]=="∞") {
+      n.classList.remove("exp");
+      n.classList.add("no_exp");
+    }
+  })
+}
 
 document.addEventListener(
   "DOMContentLoaded",
   () => {
-    FormQuery.RANGE = Object.freeze(Array.from(new Set(
-      $$("input[id$=_max],input[id$=_min]").filter(n => !n.disabled).map((n) =>
-        n.id.replace(/_(max|min)$/, "")
-      ))));
+    document.querySelectorAll("img[data-fallback]").forEach(img=>{
+      const fallback = (img.getAttribute("data-fallback")??"").trim();
+      if (fallback.length == 0) return;
+      img.addEventListener("error", () => {
+        const src = (img.getAttribute("src")??"").trim();
+        if (src === fallback) return;
+        console.log(img.src, "->", fallback);
+        img.src = fallback;
+      })
+    });
+    addExpirationInfo();
     setOrder();
     ifLocal();
     FormQuery.query_to_form();
@@ -272,7 +284,16 @@ document.addEventListener(
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-        a.closest("div.film").classList.toggle("expand");
+        const div = a.closest("div.film");
+        const top = div.getBoundingClientRect().top;
+        div.classList.toggle("expand");
+        requestAnimationFrame(() => {
+          const delta = div.getBoundingClientRect().top - top;
+          if (delta!=0) {
+            console.log(`window.scrollBy(0, ${delta})`);
+            window.scrollBy(0, delta);
+          }
+        });
       });
     });
     const urls = $$("a.title").map(i=>i.href);
@@ -345,30 +366,45 @@ function mkVideo(url, fireByUser) {
     }
     events.forEach(e=>window.addEventListener(e, onFirstUserInteraction));
   }
+  video.addEventListener("ended", async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    }
+    div.remove();
+  });
   return video;
 }
 
 function ifChange(form, id, fnc) {
   const o = document.getElementById(id);
-  const newVal = form[id];
+  const newVal = form[id]??'';
   const oldVal = o.getAttribute("data-current");
-  if (form[id] == oldVal) return;
+  if (newVal == oldVal) return;
   console.log(id, oldVal, "->", newVal);
   fnc(newVal, oldVal);
   o.setAttribute("data-current", newVal);
 }
-
 
 function onChange() {
   const div = document.getElementById("films");
   const form = FormQuery.form();
 
   ifChange(form, "view", (newVal, oldVal) => {
-    document.body.classList.remove(oldVal);
-    document.body.classList.add(newVal);
+    if(oldVal) document.body.classList.remove(oldVal);
+    if(newVal) document.body.classList.add(newVal);
   });
   ifChange(form, "order", (newVal, oldVal) => {
     ORDER.get(newVal).forEach(i => div.append(document.getElementById(i)));
+  });
+  ifChange(form, "show", (newVal, oldVal) => {
+    const css = document.getElementById("dynamicStyle");
+    if (css == null) return;
+    if ([null, "todo"].includes(newVal)) return css.innerHTML = "";
+    css.innerHTML = `
+    div.film:not(.${newVal}) {
+      display:none !important;
+    }
+    `
   });
 
   FormQuery.form_to_query();

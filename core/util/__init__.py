@@ -1,9 +1,7 @@
 import re
-from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any
+from typing import List, Dict, Union, Set, Tuple, Optional, Type, Callable, Any, TypeVar, Iterable
 from bs4 import Tag, BeautifulSoup
-from minify_html import minify
 import unicodedata
-import requests
 import logging
 from unidecode import unidecode
 from urllib.parse import urlparse, ParseResult
@@ -11,8 +9,10 @@ import pytz
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 from collections import Counter
+from os import environ
+from markdownify import markdownify as html_to_md
+from markdown import markdown as md_to_html
 
-from typing import TypeVar, Callable, Iterable
 import uuid
 
 UUID_NAMESPACE = uuid.UUID('00000000-0000-0000-0000-000000000000')
@@ -32,6 +32,13 @@ block = heads + ("p", "div", "table", "article")
 inline = ("span", "strong", "i", "em", "u", "b", "del")
 
 
+class TypeException(TypeError):
+    def __init__(self, name: str, tp: Type | str, val):
+        if isinstance(tp, type):
+            tp = tp.__name__
+        super().__init__(f"{name} must be {tp}, but it is {type(val)}: {val}")
+
+
 def dict_walk(obj: Union[Dict, List, None], path: str, instanceof: Union[None, Type, Tuple[Type, ...]] = None):
     raise_if_not_found = False
     if instanceof is not None:
@@ -46,8 +53,29 @@ def dict_walk(obj: Union[Dict, List, None], path: str, instanceof: Union[None, T
         if (instanceof == int or (isinstance(instanceof, tuple) and int in instanceof)):
             v = int(v)
     if instanceof is not None and not isinstance(v, instanceof):
-        raise ValueError(f"{path} is {type(v)} instead of {instanceof}")
+        raise ValueError(f"{path} is {type(v)} instead of {instanceof}: {v}")
     return v
+
+
+def dict_walk_positive(data: dict, field: str):
+    val = dict_walk(data, field, instanceof=(int, float, type(None)))
+    if val is None or val < 0:
+        return None
+    i = int(val)
+    return i if i == val else val
+
+
+def dict_walk_tuple(data: dict, path: str):
+    arr = dict_walk(data, path, instanceof=(list, type(None)))
+    if not arr:
+        return tuple()
+    vals = []
+    for i in arr:
+        if isinstance(i, str):
+            i = re_sp.sub(" ", i).strip()
+        if i not in ([None, ""]+vals):
+            vals.append(i)
+    return tuple(vals)
 
 
 def _dict_walk(d: Union[Dict, List, None], path: str, raise_if_not_found=False):
@@ -128,108 +156,83 @@ def get_a_href(n: Tag):
     return href
 
 
-def clean_html(html: str):
-    soup = BeautifulSoup(html, "html.parser")
-    for div in soup.findAll(["div", "p"]):
-        if not div.find("img"):
-            txt = div.get_text()
-            txt = re_sp.sub("", txt)
-            if len(txt) == 0:
+def clean_html(html: str | Tag, unwrap: str = None):
+    if html is None:
+        return None
+    if isinstance(html, Tag):
+        html = str(html)
+    max_tries = 3
+    bak = ''
+    while max_tries > 0 and bak != html:
+        max_tries = max_tries - 1
+        bak = str(html)
+        soup = BeautifulSoup(html, "html.parser")
+        s_unwrap = set(re.split(r"\s*,\s*", unwrap or ""))
+        s_unwrap.discard('')
+        s_unwrap.add("font")
+        for n in soup.select(", ".join(s_unwrap)):
+            n.unwrap()
+        for a in soup.select("a"):
+            href = a.attrs.get("href")
+            if href in (None, "", "#"):
+                a.unwrap()
+        for div in soup.select(", ".join(block)):
+            txt = get_text(div)
+            if txt is None and not div.select_one("img"):
                 div.extract()
-    h = str(soup)
-    r = re.compile("(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub("</a>\\1", h)
-    for t in tag_concat:
-        r = re.compile(
-            "</" + t + ">(\s*)<" + t + ">", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\1", h)
-    for t in tag_round:
-        r = re.compile(
-            "(<" + t + ">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\2\\1", h)
-        r = re.compile(
-            "(<" + t + " [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\2\\1", h)
-        r = re.compile(
-            "(\s+)(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\2\\1", h)
-    for t in tag_trim:
-        r = re.compile(
-            "(<" + t + ">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\1", h)
-        r = re.compile(
-            "\s+(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\1", h)
-    for t in tag_right:
-        r = re.compile(
-            "\s+(</" + t + ">)", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\1", h)
-        r = re.compile(
-            "(<" + t + ">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
-        h = r.sub("\\1", h)
-    r = re.compile(
-        r"\s*(<meta[^>]+>)\s*", re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub(r"\n\1\n", h)
-    r = re.compile(r"\n\n+", re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", h,
-               flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = re.sub(r"\s*<br/?>\s*</p>", "</p>", h,
-               flags=re.MULTILINE | re.DOTALL | re.UNICODE)
-    h = r.sub(r"\n", h)
-    return h
-
-
-def simplify_html(html: str):
-    while True:
-        new_html = __simplify_html(html)
-        if new_html == html:
-            return new_html
-        html = new_html
-
-
-def __simplify_html(html: str):
-    html = re_sp.sub(" ", html)
-    html = minify(
-        html,
-        do_not_minify_doctype=True,
-        ensure_spec_compliant_unquoted_attribute_values=True,
-        keep_spaces_between_attributes=True,
-        keep_html_and_head_opening_tags=True,
-        keep_closing_tags=True,
-        minify_js=True,
-        minify_css=True,
-        remove_processing_instructions=True
-    )
-    blocks = ("html", "head", "body", "style", "script", "meta", "p", "div", "main", "header", "footer",
-              "table", "tr", "tbody", "thead", "tfoot" "ol", "li", "ul", "h1", "h2", "h3", "h4", "h5", "h6")
-    html = re.sub(r"<(" + "|".join(blocks) +
-                  "\b)([^>]*)>", r"\n<\1\2>\n", html)
-    html = re.sub(r"</(" + "|".join(blocks) + ")>", r"\n</\1>\n", html)
-    html = re.sub(r"\n\n+", r"\n", html).strip()
-    soup = BeautifulSoup("<faketag>"+html+"<faketag>", "html.parser")
-    for n in soup.findAll(["span", "font"]):
-        n.unwrap()
-    for a in soup.findAll("a"):
-        href = a.attrs.get("href")
-        if href in (None, "", "#"):
-            a.unwrap()
-    useful = ("href", "src", "alt", "title")
-    for n in tuple(soup.select(":scope *")):
-        if n.attrs:
-            n.attrs = {k: v for k, v in n.attrs.items() if k in useful}
-    for n in soup.findAll(block + inline):
-        chls = n.select(":scope > *")
-        if len(chls) != 1:
-            continue
-        c = chls[0]
-        if c.name != n.name or get_text(c) != get_text(n):
-            continue
-        n.unwrap()
-    for br in soup.select("p br"):
-        br.replace_with(" ")
-    for n in soup.findAll("faketag"):
-        n.unwrap()
-    return clean_html(str(soup))
+        for n in soup.select(", ".join(inline)):
+            txt = get_text(n)
+            if txt is None and not n.select_one("img"):
+                n.unwrap()
+        for n in soup.find_all(block + inline):
+            chls = n.select(":scope > *")
+            if len(chls) != 1:
+                continue
+            c = chls[0]
+            if c.name != n.name or get_text(c) != get_text(n):
+                continue
+            n.unwrap()
+        html = str(soup)
+        r = re.compile(r"(\s*\.\s*)</a>", re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = r.sub(r"</a>\1", html)
+        for t in tag_concat:
+            r = re.compile(
+                r"</" + t + r">(\s*)<" + t + r">", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        for t in tag_round:
+            r = re.compile(
+                r"(<" + t + r">)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+            r = re.compile(
+                r"(<" + t + r" [^>]+>)(\s+)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+            r = re.compile(
+                r"(\s+)(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\2\1", html)
+        for t in tag_trim:
+            r = re.compile(
+                r"(<" + t + r">)\s+", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+            r = re.compile(
+                r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        for t in tag_right:
+            r = re.compile(
+                r"\s+(</" + t + r">)", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+            r = re.compile(
+                r"(<" + t + r">) +", re.MULTILINE | re.DOTALL | re.UNICODE)
+            html = r.sub(r"\1", html)
+        html = re.sub(r"\s*(<meta[^>]+>)\s*", r"\n\1\n", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"<p([^<>]*)>\s*<br/?>\s*", r"<p\1>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\s*<br/?>\s*</p>", "</p>", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\n\s*\n+", r"\n", html, flags=re.MULTILINE | re.DOTALL | re.UNICODE)
+        html = re.sub(r"\s*<br/?>\s*$", "", html, flags=re.MULTILINE)
+        html = re.sub(r"^\s*<br/?>\s*", "", html, flags=re.MULTILINE)
+        html = html.strip()
+        html = md_to_html(html_to_md(html, escape_misc=True))
+        html = html.strip()
+    return html
 
 
 def clean_js_obj(obj: Union[List, Dict, str]):
@@ -327,38 +330,6 @@ def dict_tuple(obj: Dict[str, Union[Set, List, Tuple]]):
     return {k: tuple(sorted(set(v))) for k, v in obj.items()}
 
 
-def safe_get_list_dict(url) -> List[Dict]:
-    js = []
-    try:
-        r = requests.get(url)
-        js = r.json()
-    except Exception:
-        logger.critical(url+" no se puede recuperar", exc_info=True)
-        pass
-    if not isinstance(js, list):
-        logger.critical(url+" no es una lista")
-        return []
-    for i in js:
-        if not isinstance(i, dict):
-            logger.critical(url+" no es una lista de diccionarios")
-            return []
-    return js
-
-
-def safe_get_dict(url) -> Dict:
-    js = {}
-    try:
-        r = requests.get(url)
-        js = r.json()
-    except Exception:
-        logger.critical(url+" no se puede recuperar", exc_info=True)
-        pass
-    if not isinstance(js, dict):
-        logger.critical(url+" no es un diccionario")
-        return {}
-    return js
-
-
 def plain_text(s: Union[str, Tag], is_html=False):
     if isinstance(s, str) and is_html:
         s = BeautifulSoup(s, "html.parser")
@@ -422,11 +393,6 @@ def re_and(s: str, *args: Union[str, Tuple[str]], to_log: str = None, flags=0):
     return txt
 
 
-def get_redirect(url: str):
-    r = requests.get(url, allow_redirects=False)
-    return r.headers.get('Location')
-
-
 def to_datetime(s: str):
     if s is None:
         return None
@@ -488,14 +454,24 @@ def to_uuid(s: str):
 def uniq(*args: Union[str, None]):
     arr: List[str] = []
     for a in args:
-        if a not in (None, '') and a not in arr:
+        if a not in (None, '', 'None', 'none', 'null') and a not in arr:
             arr.append(a)
     return arr
+
+
+def tp_uniq(arr):
+    if arr is None:
+        return tuple()
+    if not isinstance(arr, (list, tuple, set)):
+        raise ValueError(arr)
+    return tuple(uniq(*arr))
 
 
 def tp_split(sep: str, s: str) -> tuple[str, ...]:
     if s is None:
         return tuple()
+    if not isinstance(s, str):
+        raise ValueError(s)
     spl = re.split(r"\s*"+re.escape(sep)+r"\s*", s)
     return tuple(uniq(*spl))
 
@@ -534,3 +510,49 @@ def mapdict(fnc: Callable[[str, Any], Any], obj: list | dict | str, k: str = Non
                 obj = None
         return obj
     return obj
+
+
+def get_env(*args: str, default: str = None) -> str | None:
+    for a in args:
+        v = environ.get(a)
+        if isinstance(v, str):
+            v = v.strip()
+            if len(v):
+                return v
+    return default
+
+
+def get_first(*args):
+    for a in args:
+        if a is not None:
+            return a
+
+
+def iter_chunk(size: int, args: list):
+    arr = []
+    for a in args:
+        arr.append(a)
+        if len(arr) == size:
+            yield arr
+            arr = []
+    if arr:
+        yield arr
+
+
+def safe_index(lst: list[T] | tuple[T, ...], value: T, default: int) -> int:
+    if value in lst:
+        return lst.index(value)
+    return default
+
+
+def mk_re(*args: str, flags=0):
+    arr = []
+    for a in args:
+        a = a.strip()
+        if len(a) == 0:
+            continue
+        r = r"\s+".join(map(re.escape, a.split()))
+        arr.append(r)
+    if len(arr) == 0:
+        return ValueError("No valid patterns")
+    return re.compile("|".join(arr), flags)

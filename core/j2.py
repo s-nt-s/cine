@@ -9,6 +9,7 @@ from os.path import relpath, dirname, exists, isfile
 from os import environ, makedirs
 from base64 import b64encode
 from bs4 import Tag
+from zoneinfo import ZoneInfo
 
 import bs4
 from jinja2 import Environment, FileSystemLoader
@@ -17,6 +18,7 @@ re_br = re.compile(r"<br/>(\s*</)")
 re_sp = re.compile(r"\s+")
 PAGE_URL = environ['PAGE_URL']
 REPO_URL = environ['REPO_URL']
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 
 def get_text(n: Tag):
@@ -25,8 +27,11 @@ def get_text(n: Tag):
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, (datetime, date)):
-            return o.__str__()
+        if isinstance(o, date) and not isinstance(o, datetime):
+            o = datetime.combine(o, datetime.min.time(), tzinfo=MADRID_TZ)
+            o = o.replace(tzinfo=MADRID_TZ)
+        if isinstance(o, datetime):
+            return ["<<Date>>", o.isoformat(), "<</END>>"]
         if isinstance(o, dict_items):
             return ["<<Map>>", list(o), "<</END>>"]
         if isinstance(o, dict):
@@ -54,7 +59,7 @@ class CustomEncoder(json.JSONEncoder):
 
 
 def simplify(s: str):
-    re_rm = re.compile(r"[/\.\(\)\[\]]+")
+    re_rm = re.compile(r"[/\.\(\)\[\]&]+")
     s = re_rm.sub(" ", str(s)).strip().lower()
     s = re_sp.sub(" ", s).strip().lower()
     s = unidecode(s)
@@ -65,7 +70,10 @@ def simplify(s: str):
     s = re_sp.sub(" ", s)
     s = re_sp.sub("-", s)
     s = re.sub(r"-+", "-", s)
-    return s.strip()
+    s = s.strip()
+    if s.startswith("pelicula-de-"):
+        return s[12:]
+    return s
 
 
 def jinja_quote_plus(s: str):
@@ -123,6 +131,30 @@ def yjoin(arr: tuple):
     return ", ".join(arr[:-1])+" y "+arr[-1]
 
 
+def frm_time(m: int):
+    if m is None:
+        return ""
+    if m == 1:
+        return f'<abbr class="duration" title="{m} minuto">{m}m</abbr>'
+    if m < 60:
+        return f'<abbr class="duration" title="{m} minutos">{m}m</abbr>'
+    h = m // 60
+    m = m % 60
+    arr = []
+    if h == 1:
+        arr.append(f"{h} hora")
+    else:
+        arr.append(f"{h} horas")
+    if m == 0:
+        return f'<abbr class="duration" title="{arr[0]}">{h}h</abbr>'
+    if m == 1:
+        arr.append(f"{m} minuto")
+    elif m > 1:
+        arr.append(f"{m} minutos")
+    title = " y ".join(arr)
+    return f'<abbr class="duration" title="{title}">{h}h y {m}m</abbr>'
+
+
 def get_default_target_links(soup: bs4.Tag):
     def _isRemote(href: str):
         proto = href.split("://")[0].lower()
@@ -157,6 +189,7 @@ class Jnj2():
         self.j2_env.filters['simplify'] = simplify
         self.j2_env.filters['twoDec'] = twoDec
         self.j2_env.filters['yjoin'] = yjoin
+        self.j2_env.filters['frm_time'] = frm_time
         self.destino = destino
         self.pre = pre
         self.post = post
@@ -319,7 +352,7 @@ class Jnj2():
                     separators=separators,
                     cls=CustomEncoder
                 )
-                js = re.sub(r'\[\s*"<<(Map|Set)>>"\s*,\s*', r'new \1(', js)
+                js = re.sub(r'\[\s*"<<(Map|Set|Date)>>"\s*,\s*', r'new \1(', js)
                 js = re.sub(r'\s*,\s*"<</END>>"\s*\]', ')', js)
                 if not self.minify:
                     js = re.sub(r'\s*\[[^\[\]]+\]\s*',

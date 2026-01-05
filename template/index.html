@@ -13,50 +13,79 @@
   </script>
   <meta charset="utf-8" />
   <meta content="width=device-width, initial-scale=1" name="viewport" />
-  <title>Cine Gratis</title>
+  <title>Cine gratuito</title>
   <meta name="Last-Modified" content="{{NOW.strftime('%Y-%m-%d %H:%M:%S')}}" />
   <link rel="stylesheet" href="rec/main.css" />
   <script src="info.js"></script>
   <script src="rec/supabase.js"></script>
   <script src="rec/main.js"></script>
+  <style id="dynamicStyle"></style>
 </head>
 
-<body>
+<body class="list">
   {% include "header.html" %}
   <main>
     <p>
+        <div class="input">
         <label for="order">Ordenar por</label>
-        <select id="order" data-type="flag">
-          <option value="publicacion" selected>fecha de publicación</option>
-          <option value="expiracion">fecha fin de disponibilidad</option>
-          <option value="duracion">duración</option>
-          <option value="estreno">año de estreno</option>
-          <option value="titulo">título</option>
-          <option value="director">director/a</option>
-          <option value="genero">genero</option>
-          <option value="imdb">puntuación en IMDb</option>
+        <select id="order">
+          <option value="publicacion" selected>🗓️ fecha de publicación</option>
+          <option value="expiracion">⏳ fin de disponibilidad</option>
+          <option value="duracion">⏱️ duración</option>
+          <option value="estreno">🍿 año de estreno</option>
+          <option value="titulo">🆎 título</option>
+          <option value="director">🎥 director/a</option>
+          <option value="puntuacion">⭐ puntuación</option>
+          <!--option value="imdb">⭐ puntuación en IMDb</option>
+          <option value="filmaffinity">💠 puntuación en FilmAffinity</option-->
         </select>
-        <label for="view">Ver</label>
-        <select id="view" data-type="flag">
-          <option value="lista" selected>lista</option>
-          <option value="cuadricula">cuadricula</option>
+        </div>
+        <div class="input">
+        <label for="show">Ver</label>
+        <select id="show">
+          <option value="todo" selected>todo</option>
+          <optgroup label="Genero">
+          {% for g, c in genres.items() %}
+          <option value="{{g|simplify}}">{{genres_unicode[g|simplify]}} {{g}} ({{c}})</option>
+          {% endfor %}
+          </optgroup>
+          <optgroup label="País">
+          {% for c, n in countries.items() %}
+          <option value="{{c.spa|simplify}}">{{c.ico or "🏴‍☠️"}} {{c.spa}} ({{n}})</option>
+          {% endfor %}
+          </optgroup>
+          <optgroup label="Proveedor">
+          {% for p, c in providers.items() %}
+          <option value="{{p|simplify}}">{{p}} ({{c}})</option>
+          {% endfor %}
+          </optgroup>
         </select>
+        </div>
     </p>
     <div id="films">
       {% for f in fl %}
-      <div class="film" id="{{f.source}}{{f.id}}">
+      <div class="film {{f.source}} {{f.get_provider()|simplify}} {%for g in f.genres %}{{g|simplify}} {%endfor%} {%for c in f.country %}{{c.spa|simplify}} {%endfor%}" id="{{f.source}}{{f.id}}">
         <h1 style="display: none">{{f.title}}</h1>
-        <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster"/></a>
-          <p>{%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}</span> {%if f.imdbId%}<a class="imdb" href="https://www.imdb.com/es-es/title/{{f.imdbId}}">IMDb{%if f.imdbRate%} <span class="imdbRate" title="{{f.imdbRate}} sobre 10{%if f.imdbVotes%} en base a {{f.imdbVotes}} votos{%endif%}">{{f.imdbRate}}</span>{%endif%}</a> {%endif%}{%if f.filmaffinity%}<a title="Ficha filmaffinity" class="filmaffinity" href="https://www.filmaffinity.com/es/film{{f.filmaffinity}}.html">F</a> {%endif%}{%if f.wiki%}<a class="wiki" href="{{f.wiki}}">W</a> {%endif%}</p>
-          <p><span class="duration">{{f.duration}} <abbr title="minutos">min</abbr></span>{%for c in f.country%} {{c.to_html()|safe}}{%endfor%}</p>
+        <a class="poster" href="{{f.url}}"><img src="{{f.img}}" alt="Poster de {{f.title}}" title="{{f.title}}" loading="lazy" class="poster" {%if f.fallback%}data-fallback="{{f.fallback}}"{%endif%}/></a>
+          <p class="botonera">
+            {% if f.expiration %}<abbr class="expiration exp" title="Fecha de expiración {{f.expiration}}" data-expiration="{{f.expiration}}">⏳</abbr>
+            {% else %}<abbr class="expiration no_exp" title="Disponible indefinidamente">∞</abbr>{% endif %}
+            {{f.get_score().to_html()|safe}}
+            {%if f.imdb%}{{f.imdb.to_html()|safe }} {% endif %}
+            {%if f.filmaffinity%}{{f.filmaffinity.to_html()|safe}} {%endif%}
+            {%if f.wiki%}{{f.wiki.to_html()|safe}} {%endif%}
+            {%for g in f.genres %} <span class="genre {{g|simplify}}">{{g}}</span>{%endfor%}
+          </p>
+          <p>
+          {{f.duration | frm_time | safe}}{%for c in f.country%} {{c.to_html()|safe}}{%endfor%} <span class="povider {{f.get_provider()|simplify}}">{{f.get_provider()}}</span></p>
           <p>
             <span>({{f.year}})</span> <b><a href="{{f.url}}" class="title">{{f.title}}</a></b>
           </p>
-          <p><b>{{f.director|yjoin}}</b>{%if f.director and f.casting %} || {%endif%}<span>{{f.casting|yjoin}}</span></p>
+          <p><b>{{f.director|yjoin}}</b>{%if f.casting %} || <span>{{f.casting|yjoin}}</span>{% endif %}</p>
           <p>{{f.description}}</p>
-          {% if f.expiration %}
-          <!--p>Disponible hasta <span class="expiration">{{f.expiration}}</span></p-->
-          {% endif %}
+          {%if f.alt %}
+          <p>Otras versiones:{%for x in f.alt%}{% if loop.index>1 %},{%endif%} <a href="{{x.url}}">{{x.get_provider()}}</a>{%endfor%}</p>
+          {%endif%}
       </div>
       {% endfor %}
     </div>

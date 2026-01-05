@@ -180,3 +180,6 @@ class DBCache:
         self.__func = func
         setattr(callCache, "__cache_obj__", self)
         return callCache
+
+
+DB = Database()
