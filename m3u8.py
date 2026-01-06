@@ -64,7 +64,7 @@ def safe_get_m3u8(*urls):
 if __name__ == "__main__":
     from core.db import DB
     r = requests.get(environ['PAGE_URL'])
-    urls = re.findall(re.escape('https://www.rtve.es/play/')+r'[^"]+?/\d+/', r.text)
+    urls = re.findall(r'"('+re.escape('https://www.rtve.es/play/')+r'[^"]+?/\d+/)"', r.text)
     done = DB.to_tuple("SELECT url FROM M3U8 WHERE updated > NOW() - INTERVAL '10 days'")
     urls = sorted(set(urls).difference(done))
     for k, v in safe_get_m3u8(*urls):
