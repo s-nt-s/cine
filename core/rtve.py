@@ -230,6 +230,8 @@ class Rtve(Web):
 
     def get_video(self, ficha_id: int, li: Tag = None):
         ficha = self.get_ficha(ficha_id)
+        if ficha is None:
+            return None
         idAsset = dict_walk(ficha, 'id', instanceof=(int, type(None)))
         if idAsset != ficha_id:
             raise ValueError(ficha)
@@ -378,8 +380,18 @@ class Rtve(Web):
 
     @Cache("rec/rtve/ficha/{}.json")
     def get_ficha(self, id: int) -> dict[str, Any]:
-        js = self.json(f"https://api.rtve.es/api/videos/{id}.json")
-        return mapdict(_clean_js, js['page']['items'][0], compact=True)
+        url = f"https://api.rtve.es/api/videos/{id}.json"
+        js = self.json(url)
+        if not isinstance(js, dict):
+            raise ValueError(f"not dict {url}")
+        error = js.get("http error 404")
+        if error:
+            logger.critical(f"{error} in {url}")
+            return None
+        page = js.get('page')
+        if not isinstance(page, dict):
+            raise ValueError(f"not dict[page] {url}")
+        return mapdict(_clean_js, page['items'][0], compact=True)
 
 
 if __name__ == "__main__":
