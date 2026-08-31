@@ -208,7 +208,7 @@ class EFilm:
 
     @Cache("rec/efilm/items.json")
     def get_items(self) -> list[dict]:
-        root = f"https://backend-prod.efilm.online/api/v1/products/products/relevant/?duration_gte={self.__min_duration}&page=1&page_size=1000&product_type=audiovisual&skip_chapters=true"
+        root = f"https://backend-prod.efilm.online/api/v1/products/products/relevant/?duration_gte={self.__min_duration}&page=1&page_size=500&product_type=audiovisual&skip_chapters=true"
         done: set[int] = set()
         arr = []
         i: dict
