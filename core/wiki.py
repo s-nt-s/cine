@@ -482,7 +482,7 @@ class WikiApi:
         arr.append("LIMIT 1")
         query = "\n".join(arr)
         dt = self.query(query)
-        if isinstance(dt, list):
+        if isinstance(dt, list) and len(dt):
             obj = dt[0]
             if isinstance(obj, dict):
                 obj = obj.get('fieldLabel')
